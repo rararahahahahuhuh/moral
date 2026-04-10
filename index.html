@@ -1,872 +1,3286 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BINARY MORAL</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@700;900&family=Roboto+Mono:wght@400;700&display=swap');
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>BINARY MORAL</title>
+<style>
+/* ==========================================
+   0. DESIGN TOKENS & RESET
+   ========================================== */
+:root {
+  --white: #F5F5F5;
+  --black: #000000;
+  --red: #D91A1A;
+  --blue: #1A4CB3;
+  --gray: #4D4D4D;
+  --gray-light: rgba(0,0,0,.08);
+  --gray-mid: rgba(0,0,0,.25);
+  --card-w: min(320px, 85vw);
+  --card-h: min(520px, 72vh);
+  --radius: 0;
+  --mono: 'SF Mono','Fira Code','Roboto Mono','Menlo','Consolas',monospace;
+  --serif: 'Georgia','Noto Serif JP','Times New Roman',serif;
+  --sans: 'Helvetica Neue','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
+  --transition: .35s cubic-bezier(.4,0,.2,1);
+}
+@media(min-width:768px){
+  :root{ --card-w:420px; --card-h:620px; }
+}
 
-        :root {
-            --clinical-white: #f5f5f5;
-            --void-black: #000000;
-            --alarm-red: #d91a1a;
-            --cold-blue: #1a4db3;
-            --card-border: 3px;
-        }
+*,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
+html{ -webkit-text-size-adjust:100%; }
+body{
+  background:var(--white);
+  color:var(--black);
+  font-family:var(--mono);
+  overflow:hidden;
+  height:100dvh; width:100vw;
+  display:flex; justify-content:center; align-items:center;
+  -webkit-user-select:none; user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+button{ font-family:var(--mono); cursor:pointer; border:none; background:none; }
+canvas{ display:block; }
 
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: var(--clinical-white);
-            color: var(--void-black);
-            font-family: 'Roboto Mono', monospace;
-            overflow: hidden;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            user-select: none;
-            -webkit-user-select: none;
-        }
+/* ==========================================
+   1. SCREEN SYSTEM
+   ========================================== */
+.screen{
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center;
+  max-width:560px; margin:0 auto; padding:20px;
+  opacity:0; pointer-events:none;
+  transition:opacity var(--transition);
+}
+.screen.active{ opacity:1; pointer-events:auto; }
+.screen.result-active{
+  opacity:1; pointer-events:auto;
+  overflow-y:auto; -webkit-overflow-scrolling:touch;
+}
 
-        /* --- Common Utils --- */
-        .hidden { display: none !important; }
-        .fade-in { animation: fadeIn 0.5s ease-in forwards; }
-        .fade-out { animation: fadeOut 0.5s ease-out forwards; }
-        .blink { animation: blink 1s infinite; }
+/* ==========================================
+   2. TITLE SCREEN
+   ========================================== */
+#screen-title{ justify-content:center; gap:40px; }
+.title-frame{
+  border:4px solid var(--black);
+  padding:28px 36px;
+  text-align:center;
+  position:relative;
+}
+.title-frame::before{
+  content:''; position:absolute; inset:-8px;
+  border:1px solid var(--gray-mid);
+}
+.title-binary{
+  font-size:clamp(36px,10vw,64px);
+  font-weight:900;
+  letter-spacing:.15em;
+  line-height:1;
+  font-family:var(--mono);
+}
+.title-moral{
+  font-size:clamp(36px,10vw,64px);
+  font-weight:900;
+  letter-spacing:.15em;
+  line-height:1;
+  color:var(--red);
+  font-family:var(--serif);
+}
+.title-sub{
+  font-size:11px; font-weight:700;
+  letter-spacing:.2em;
+  color:var(--gray);
+  text-align:center;
+}
+.title-warning{
+  text-align:center;
+}
+.title-warning h4{
+  font-size:13px; color:var(--red);
+  letter-spacing:.15em;
+  margin-bottom:6px;
+}
+.title-warning p{
+  font-size:10px; color:var(--gray);
+  line-height:1.6;
+}
+.btn-initiate{
+  background:var(--black);
+  color:#fff;
+  font-size:14px; font-weight:700;
+  letter-spacing:.1em;
+  padding:18px 42px;
+  animation:blink 1.2s ease-in-out infinite alternate;
+  transition:transform .15s;
+}
+.btn-initiate:active{ transform:scale(.96); }
+@keyframes blink{ from{opacity:1} to{opacity:.45} }
 
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+/* ==========================================
+   3. GAME SCREEN
+   ========================================== */
+#screen-game{ justify-content:space-between; padding-top:0; padding-bottom:0; }
 
-        /* --- Title Screen --- */
-        #title-screen {
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            height: 80vh;
-            width: 100%;
-            padding: 20px;
-            box-sizing: border-box;
-        }
+/* progress */
+.progress-wrap{
+  width:100%; padding:50px 20px 0;
+}
+.progress-label{
+  font-size:9px; font-weight:700;
+  letter-spacing:.15em;
+  color:var(--gray);
+  text-align:center;
+  margin-bottom:8px;
+}
+.progress-track{
+  width:100%; height:3px;
+  background:var(--gray-light);
+  position:relative;
+}
+.progress-fill{
+  height:100%; width:0%;
+  background:var(--black);
+  transition:width .4s ease;
+}
 
-        .logo-box {
-            border: 4px solid var(--void-black);
-            padding: 20px;
-            margin-bottom: 10px;
-            display: inline-block;
-        }
+/* timer */
+.timer-display{
+  font-size:clamp(22px,5vw,32px);
+  font-weight:900;
+  letter-spacing:.05em;
+  text-align:center;
+  padding:12px 0;
+  transition:color .2s;
+}
+.timer-display.urgent{ color:var(--red); }
 
-        .logo-text-en {
-            font-size: 3rem;
-            font-weight: 900;
-            letter-spacing: 0.2em;
-            display: block;
-            line-height: 1;
-        }
-        
-        .color-red { color: var(--alarm-red); font-family: 'Noto Serif JP', serif; }
+/* card area */
+.card-stage{
+  position:relative;
+  width:var(--card-w); height:var(--card-h);
+  flex-shrink:0;
+}
 
-        .start-btn {
-            background: var(--void-black);
-            color: white;
-            border: none;
-            padding: 20px 40px;
-            font-family: 'Roboto Mono', monospace;
-            font-size: 1.2rem;
-            font-weight: bold;
-            cursor: pointer;
-            animation: pulse 2s infinite;
-        }
+.card{
+  position:absolute; inset:0;
+  background:#fff;
+  border:3px solid var(--black);
+  display:flex; flex-direction:column;
+  touch-action:none; cursor:grab;
+  will-change:transform;
+  transition:box-shadow .2s;
+  overflow:hidden;
+}
+.card:active{ cursor:grabbing; }
+.card-header{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:16px 18px 0;
+}
+.card-dot{
+  width:8px; height:8px;
+  background:var(--red);
+  border-radius:50%;
+}
+.card-id{
+  font-size:9px; color:var(--gray); font-weight:600;
+}
+.card-body{
+  flex:1;
+  display:flex; flex-direction:column;
+  justify-content:center; align-items:center;
+  padding:20px 22px;
+  gap:18px;
+}
+.card-title-text{
+  font-family:var(--serif);
+  font-size:clamp(24px,6vw,36px);
+  font-weight:900;
+  text-align:center;
+  line-height:1.15;
+}
+.card-divider{
+  width:60px; height:2px;
+  background:var(--black);
+}
+.card-sub-text{
+  font-family:var(--sans);
+  font-size:clamp(14px,3.5vw,17px);
+  text-align:center;
+  line-height:1.7;
+  color:rgba(0,0,0,.75);
+  white-space:pre-line;
+}
+/* swipe feedback overlays */
+.card-overlay{
+  position:absolute; inset:0;
+  display:flex; justify-content:center; align-items:center;
+  opacity:0; transition:opacity .05s;
+  pointer-events:none;
+}
+.card-overlay.yes{
+  background:rgba(217,26,26,.08);
+  border:3px solid var(--red);
+}
+.card-overlay.no{
+  background:rgba(26,76,179,.08);
+  border:3px solid var(--blue);
+}
+.card-overlay-label{
+  font-size:clamp(56px,14vw,80px);
+  font-weight:900;
+  letter-spacing:.08em;
+}
+.card-overlay.yes .card-overlay-label{
+  color:var(--red);
+  transform:rotate(-15deg);
+}
+.card-overlay.no .card-overlay-label{
+  color:var(--blue);
+  transform:rotate(15deg);
+}
 
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+/* choice feedback text */
+.card-feedback{
+  font-size:11px; font-weight:700;
+  letter-spacing:.15em;
+  display:none;
+}
+.card-feedback.yes-fb{ color:var(--red); }
+.card-feedback.no-fb{ color:var(--blue); }
 
-        /* --- Game Screen --- */
-        #game-screen {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+/* controls */
+.controls{
+  display:flex; gap:clamp(40px,12vw,80px);
+  padding:24px 0 clamp(32px,6vh,56px);
+}
+.btn-choice{
+  width:72px; height:72px;
+  border-radius:50%;
+  border:3px solid var(--black);
+  background:#fff;
+  display:flex; justify-content:center; align-items:center;
+  font-size:28px; font-weight:900;
+  transition:transform .12s, box-shadow .12s;
+}
+.btn-choice:active{
+  transform:scale(.9);
+  box-shadow:0 0 0 4px var(--gray-light);
+}
+.btn-choice.no{ color:var(--blue); }
+.btn-choice.yes{ color:var(--red); }
+.btn-choice-label{
+  font-size:11px; font-weight:800;
+  letter-spacing:.1em;
+  margin-top:8px;
+  text-align:center;
+}
+.btn-choice.no + .btn-choice-label{ color:var(--blue); }
+.control-unit{ display:flex; flex-direction:column; align-items:center; }
 
-        .progress-bar-container {
-            width: 80%;
-            height: 4px;
-            background: rgba(0,0,0,0.1);
-            margin-top: 60px;
-            position: relative;
-        }
+/* ==========================================
+   4. TIMEOUT OVERLAY
+   ========================================== */
+#timeout-overlay{
+  position:fixed; inset:0; z-index:1000;
+  background:var(--red);
+  display:flex; flex-direction:column;
+  justify-content:center; align-items:center; gap:20px;
+  opacity:0; pointer-events:none;
+  transition:opacity .12s;
+}
+#timeout-overlay.active{ opacity:1; pointer-events:auto; }
+#timeout-overlay .icon{
+  font-size:60px; color:#fff;
+}
+#timeout-overlay h1{
+  font-size:clamp(24px,6vw,36px);
+  font-weight:900;
+  color:#fff;
+  letter-spacing:.2em;
+  text-align:center;
+}
+#timeout-overlay p{
+  font-size:12px; color:rgba(255,255,255,.6);
+  letter-spacing:.1em;
+}
 
-        .progress-bar {
-            height: 100%;
-            background: var(--void-black);
-            width: 0%;
-            transition: width 0.3s linear;
-        }
+/* ==========================================
+   5. ANALYZING SCREEN
+   ========================================== */
+#screen-analyzing{
+  justify-content:center; gap:30px;
+}
+.analyzing-text{
+  font-size:clamp(20px,5vw,28px);
+  font-weight:900;
+  letter-spacing:.2em;
+  animation:analyzePulse 1s ease-in-out infinite alternate;
+}
+@keyframes analyzePulse{
+  from{ opacity:1; } to{ opacity:.25; }
+}
+.analyzing-bar{
+  width:200px; height:2px;
+  background:var(--gray-light);
+  overflow:hidden;
+}
+.analyzing-bar-inner{
+  width:40%; height:100%;
+  background:var(--black);
+  animation:analyzeSlide 1.2s ease-in-out infinite;
+}
+@keyframes analyzeSlide{
+  0%{ transform:translateX(-100%); }
+  100%{ transform:translateX(350%); }
+}
+.analyzing-sub{
+  font-size:10px; color:var(--gray);
+  letter-spacing:.15em;
+}
 
-        .card-stack {
-            position: relative;
-            width: 320px;
-            height: 520px;
-            margin-top: 40px;
-            perspective: 1000px;
-        }
+/* ==========================================
+   6. RESULT SCREEN
+   ========================================== */
+#screen-result{
+  padding:0;
+  align-items:stretch;
+}
 
-        .card {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background: white;
-            border: 3px solid var(--void-black);
-            border-radius: 16px;
-            box-sizing: border-box;
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            transform-origin: 50% 100%;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            will-change: transform, opacity;
-        }
+.result-header{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:16px 20px;
+  background:rgba(0,0,0,.03);
+  border-bottom:1px solid var(--gray-light);
+  flex-shrink:0;
+}
+.result-header-label{
+  font-size:11px; font-weight:700;
+  color:var(--red);
+  letter-spacing:.12em;
+}
+.btn-share{
+  font-size:11px; font-weight:700;
+  letter-spacing:.08em;
+  padding:7px 14px;
+  border:1px solid var(--black);
+  display:flex; align-items:center; gap:6px;
+}
+.btn-share:active{ background:var(--black); color:#fff; }
 
-        .card-header {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.7rem;
-            color: gray;
-        }
+.result-scroll{
+  flex:1; overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:24px 20px 0;
+}
 
-        .card-dot { width: 8px; height: 8px; background: var(--alarm-red); border-radius: 50%; }
+.result-section{
+  max-width:520px; margin:0 auto;
+  display:flex; flex-direction:column; align-items:center; gap:28px;
+}
 
-        .card-title {
-            font-family: 'Noto Serif JP', serif;
-            font-size: 2rem;
-            font-weight: 900;
-            text-align: center;
-            margin-top: auto;
-            margin-bottom: 20px;
-            line-height: 1.2;
-        }
+/* soul canvas */
+.soul-canvas-wrap{
+  width:clamp(200px,55vw,280px);
+  height:clamp(200px,55vw,280px);
+}
+#soulCanvas{ width:100%; height:100%; }
 
-        .card-divider {
-            width: 80%;
-            height: 2px;
-            background: var(--void-black);
-            margin-bottom: 20px;
-        }
+/* code badge */
+.result-code{
+  font-size:clamp(18px,4.5vw,24px);
+  font-weight:700;
+  letter-spacing:.12em;
+  padding:8px 20px;
+  border:2px solid var(--black);
+}
 
-        .card-text {
-            font-size: 1.1rem;
-            text-align: center;
-            line-height: 1.8;
-            margin-bottom: auto;
-        }
+/* archetype name */
+.result-name{
+  font-family:var(--serif);
+  font-size:clamp(28px,7vw,44px);
+  font-weight:900;
+  text-align:center;
+  line-height:1.2;
+}
 
-        /* Stamps */
-        .stamp {
-            position: absolute;
-            top: 40px;
-            border: 4px solid;
-            border-radius: 8px;
-            padding: 5px 20px;
-            font-size: 3rem;
-            font-weight: 900;
-            opacity: 0;
-            transform: rotate(-15deg);
-        }
-        .stamp-yes { color: var(--alarm-red); border-color: var(--alarm-red); right: 40px; }
-        .stamp-no { color: var(--cold-blue); border-color: var(--cold-blue); left: 40px; transform: rotate(15deg); }
+/* parameter gauges */
+.gauges{
+  width:100%;
+  display:flex; flex-direction:column; gap:20px;
+}
+.gauge{
+  width:100%;
+}
+.gauge-labels{
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:4px;
+}
+.gauge-side{
+  font-size:9px; font-weight:700;
+  color:var(--gray);
+  transition:color .3s;
+}
+.gauge-side.active-neg{ color:var(--red); }
+.gauge-side.active-pos{ color:var(--blue); }
+.gauge-name{
+  font-size:10px; font-weight:900;
+  letter-spacing:.1em;
+}
+.gauge-track{
+  position:relative; width:100%; height:6px;
+  background:rgba(0,0,0,.06);
+  border-radius:0;
+}
+.gauge-center{
+  position:absolute;
+  left:50%; top:-2px;
+  width:1px; height:10px;
+  background:rgba(0,0,0,.25);
+}
+.gauge-bar{
+  position:absolute; top:0; height:100%;
+  transition:width .6s ease, left .6s ease;
+}
+.gauge-bar.pos{ background:var(--blue); }
+.gauge-bar.neg{ background:var(--red); }
 
-        /* Controls */
-        .controls {
-            margin-top: auto;
-            margin-bottom: 40px;
-            display: flex;
-            gap: 60px;
-        }
-        .control-btn {
-            background: white;
-            border: none;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-        }
-        .circle-btn {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            border: 3px solid var(--void-black);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 2rem;
-            font-weight: bold;
-            transition: transform 0.1s;
-        }
-        .circle-btn:active { transform: scale(0.9); }
-        .btn-yes .circle-btn { color: var(--alarm-red); }
-        .btn-yes span { color: var(--alarm-red); font-weight: bold; }
-        .btn-no .circle-btn { color: var(--cold-blue); }
-        .btn-no span { color: var(--cold-blue); font-weight: bold; }
+/* divider */
+.result-divider{
+  width:100%; height:1px;
+  background:var(--gray-light);
+}
 
-        /* Overlay */
-        #analyzing-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(245,245,245,0.9);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            font-size: 2rem;
-            font-weight: 900;
-            letter-spacing: 2px;
-        }
+/* description */
+.result-desc{
+  font-family:var(--sans);
+  font-size:clamp(13px,3.2vw,15px);
+  line-height:2;
+  color:rgba(0,0,0,.85);
+  padding:24px;
+  background:#fff;
+  border:1px solid var(--black);
+  white-space:pre-wrap;
+  width:100%;
+}
 
-        /* --- Result Screen --- */
-        #result-screen {
-            width: 100%;
-            height: 100%;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            padding: 20px;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+/* toxic match */
+.toxic-wrap{
+  width:100%;
+  border:3px solid var(--red);
+  overflow:hidden;
+}
+.toxic-header{
+  display:flex; align-items:center; gap:8px;
+  padding:12px 16px;
+  background:rgba(217,26,26,.06);
+  font-size:12px; font-weight:900;
+  letter-spacing:.1em;
+  color:var(--red);
+}
+.toxic-body{
+  padding:18px 20px;
+  background:#fff;
+}
+.toxic-label{
+  font-size:10px; font-weight:700;
+  color:var(--gray);
+  margin-bottom:4px;
+}
+.toxic-enemy-name{
+  font-size:clamp(18px,4.5vw,22px);
+  font-weight:900;
+  margin-bottom:14px;
+}
+.toxic-reason{
+  font-family:var(--sans);
+  font-size:13px;
+  line-height:1.8;
+  white-space:pre-wrap;
+}
 
-        .result-header {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.8rem;
-            background: rgba(0,0,0,0.05);
-            padding: 10px;
-            margin-bottom: 20px;
-        }
+/* receipt */
+.receipt-wrap{
+  width:280px; margin:20px auto 0;
+  display:flex; flex-direction:column; align-items:center;
+}
+.receipt-holes{
+  display:flex; gap:4px;
+  margin-bottom:-3px; z-index:1;
+}
+.receipt-hole{
+  width:10px; height:10px;
+  background:var(--white);
+  border-radius:50%;
+}
+.receipt-paper{
+  background:#fff;
+  border:1px solid var(--gray-light);
+  box-shadow:0 4px 16px rgba(0,0,0,.06);
+  padding:18px;
+  width:100%;
+}
+.receipt-title{
+  font-size:11px; font-weight:700;
+  text-align:center;
+  letter-spacing:.1em;
+  margin-bottom:10px;
+}
+.receipt-line{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:3px 0;
+  font-size:11px;
+  opacity:0;
+  animation:receiptFade .2s forwards;
+}
+.receipt-line .sin-name{ font-weight:600; }
+.receipt-line .sin-name.r{ color:var(--red); }
+.receipt-line .sin-name.l{ color:var(--blue); }
+.receipt-line .sin-type{
+  font-size:9px; color:var(--gray);
+}
+.receipt-divider{
+  height:1px; background:var(--gray-light);
+  margin:8px 0;
+}
+.receipt-total{
+  display:flex; justify-content:space-between;
+  font-size:13px; font-weight:700;
+  padding-top:4px;
+  opacity:0; animation:receiptFade .3s forwards;
+}
+@keyframes receiptFade{ to{ opacity:1; } }
 
-        .code-box {
-            border: 2px solid var(--void-black);
-            padding: 5px 15px;
-            font-size: 1.5rem;
-            font-weight: bold;
-            border-radius: 6px;
-            margin-bottom: 10px;
-        }
+/* retry */
+.result-footer{
+  flex-shrink:0;
+  padding:16px 20px;
+  border-top:1px solid var(--gray-light);
+  background:var(--white);
+}
+.btn-retry{
+  width:100%;
+  padding:14px;
+  font-size:13px; font-weight:700;
+  letter-spacing:.1em;
+  color:var(--gray);
+  text-align:center;
+  display:flex; justify-content:center; align-items:center; gap:8px;
+}
+.btn-retry:active{ color:var(--black); }
 
-        .archetype-title {
-            font-family: 'Noto Serif JP', serif;
-            font-size: 2.2rem;
-            font-weight: 900;
-            text-align: center;
-            margin-bottom: 20px;
-            line-height: 1.2;
-        }
+/* ==========================================
+   7. UTILITIES
+   ========================================== */
+.hidden{ display:none !important; }
 
-        .description-box {
-            background: white;
-            border: 1px solid var(--void-black);
-            border-radius: 8px;
-            padding: 20px;
-            font-size: 0.95rem;
-            line-height: 1.8;
-            white-space: pre-wrap;
-            width: 100%;
-            box-sizing: border-box;
-            margin-bottom: 30px;
-        }
+/* scrollbar styling */
+.result-scroll::-webkit-scrollbar{ width:3px; }
+.result-scroll::-webkit-scrollbar-track{ background:transparent; }
+.result-scroll::-webkit-scrollbar-thumb{ background:var(--gray-mid); }
 
-        /* Receipt */
-        .receipt {
-            background: white;
-            width: 100%;
-            max-width: 320px;
-            padding: 20px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            position: relative;
-            margin-bottom: 30px;
-            box-sizing: border-box;
-        }
-        .receipt::before {
-            content: "";
-            position: absolute;
-            top: -5px; left: 0; right: 0;
-            height: 10px;
-            background: radial-gradient(circle, transparent 5px, white 6px);
-            background-size: 15px 15px;
-            background-position: -7px -5px;
-        }
+/* ==========================================
+   8. SYSTEM ORIENTATION SCREEN
+   ========================================== */
+#screen-orientation{
+  justify-content:center; gap:32px;
+  padding:28px;
+}
+.orient-frame{
+  width:100%; max-width:440px;
+  border:2px solid var(--black);
+  padding:0;
+}
+.orient-header{
+  background:var(--black);
+  color:var(--white);
+  padding:10px 16px;
+  font-size:11px; font-weight:700;
+  letter-spacing:.15em;
+  display:flex; align-items:center; gap:8px;
+}
+.orient-header::before{
+  content:''; display:inline-block;
+  width:8px; height:8px;
+  background:var(--red);
+  border-radius:50%;
+  animation:blink 1.2s ease-in-out infinite alternate;
+}
+.orient-body{
+  padding:24px 20px;
+  display:flex; flex-direction:column; gap:18px;
+}
+.orient-body p{
+  font-family:var(--sans);
+  font-size:clamp(12px,3vw,14px);
+  line-height:1.9;
+  color:rgba(0,0,0,.8);
+}
+.orient-body p strong{
+  color:var(--red); font-weight:700;
+}
+.orient-disclaimer{
+  border-top:1px solid var(--gray-light);
+  padding-top:14px;
+  margin-top:4px;
+}
+.orient-disclaimer p{
+  font-size:10px !important;
+  color:var(--gray) !important;
+  line-height:1.7 !important;
+}
+.orient-count{
+  text-align:center;
+  font-size:10px; font-weight:700;
+  letter-spacing:.12em;
+  color:var(--gray);
+}
+.btn-proceed{
+  background:var(--black);
+  color:#fff;
+  font-size:13px; font-weight:700;
+  letter-spacing:.1em;
+  padding:16px 36px;
+  transition:transform .15s;
+  align-self:center;
+}
+.btn-proceed:active{ transform:scale(.96); }
 
-        .receipt-header { text-align: center; margin-bottom: 15px; }
-        .receipt-row { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 5px; }
-        .receipt-divider { border-bottom: 1px dashed black; margin: 10px 0; }
-        .receipt-total { font-size: 1.2rem; font-weight: 900; text-align: right; }
-        .receipt-footer { text-align: center; font-size: 0.9rem; margin-top: 15px; font-weight: bold; }
+/* ==========================================
+   9. SYSTEM ARCHIVE (CATALOGUE) SCREEN
+   ========================================== */
+#screen-archive{
+  padding:0;
+  align-items:stretch;
+}
+#screen-archive.active{
+  overflow-y:auto; -webkit-overflow-scrolling:touch;
+}
+.archive-header{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:16px 20px;
+  background:rgba(0,0,0,.03);
+  border-bottom:1px solid var(--gray-light);
+  flex-shrink:0;
+  position:sticky; top:0; z-index:10;
+  background:var(--white);
+}
+.archive-header-label{
+  font-size:11px; font-weight:700;
+  color:var(--red);
+  letter-spacing:.12em;
+}
+.btn-archive-close{
+  font-size:11px; font-weight:700;
+  letter-spacing:.08em;
+  padding:7px 14px;
+  border:1px solid var(--black);
+}
+.btn-archive-close:active{ background:var(--black); color:#fff; }
+.archive-scroll{
+  flex:1; overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:0;
+}
+.archive-list{
+  list-style:none;
+  margin:0; padding:0;
+}
+.archive-item{
+  border-bottom:1px solid var(--gray-light);
+}
+.archive-item-header{
+  display:flex; align-items:center; gap:12px;
+  padding:14px 20px;
+  cursor:pointer;
+  transition:background .15s;
+  width:100%;
+  text-align:left;
+  font-family:var(--mono);
+}
+.archive-item-header:hover{ background:rgba(0,0,0,.03); }
+.archive-item-header:active{ background:rgba(0,0,0,.06); }
+.archive-item-idx{
+  font-size:9px; font-weight:700;
+  color:var(--gray);
+  width:28px; flex-shrink:0;
+  letter-spacing:.05em;
+}
+.archive-item-code{
+  font-size:10px; font-weight:700;
+  color:var(--red);
+  letter-spacing:.08em;
+  width:76px; flex-shrink:0;
+}
+.archive-item-name{
+  font-family:var(--serif);
+  font-size:clamp(14px,3.5vw,17px);
+  font-weight:700;
+  flex:1;
+}
+.archive-item-arrow{
+  font-size:14px;
+  color:var(--gray);
+  transition:transform .25s;
+  flex-shrink:0;
+}
+.archive-item.open .archive-item-arrow{
+  transform:rotate(90deg);
+}
+.archive-item-detail{
+  max-height:0;
+  overflow:hidden;
+  transition:max-height .35s cubic-bezier(.4,0,.2,1);
+}
+.archive-item.open .archive-item-detail{
+  max-height:3000px;
+}
+.archive-detail-inner{
+  padding:0 20px 20px;
+  margin-left:40px;
+}
+.archive-detail-inner .toxic-mini{
+  margin-top:14px;
+  padding:10px 14px;
+  border:2px solid var(--red);
+  font-size:11px;
+}
+.archive-detail-inner .toxic-mini-label{
+  font-size:9px; font-weight:700;
+  color:var(--red);
+  letter-spacing:.1em;
+  margin-bottom:4px;
+}
+.archive-detail-inner .toxic-mini-name{
+  font-weight:700;
+  margin-bottom:6px;
+}
+.archive-detail-inner .toxic-mini-reason{
+  font-family:var(--sans);
+  font-size:11px;
+  color:var(--gray);
+  line-height:1.6;
+  white-space:pre-wrap;
+}
+.archive-desc{
+  font-family:var(--sans);
+  font-size:clamp(12px,2.8vw,13px);
+  line-height:1.9;
+  color:rgba(0,0,0,.8);
+  white-space:pre-wrap;
+  border-left:2px solid var(--black);
+  padding-left:14px;
+}
+.archive-footer{
+  flex-shrink:0;
+  padding:16px 20px;
+  border-top:1px solid var(--gray-light);
+  background:var(--white);
+  position:sticky; bottom:0;
+}
+.btn-archive-back{
+  width:100%;
+  padding:14px;
+  font-size:13px; font-weight:700;
+  letter-spacing:.1em;
+  color:var(--gray);
+  text-align:center;
+  display:flex; justify-content:center; align-items:center; gap:8px;
+}
+.btn-archive-back:active{ color:var(--black); }
 
-        .retry-btn {
-            background: var(--void-black);
-            color: white;
-            width: 100%;
-            padding: 15px;
-            font-size: 1rem;
-            font-weight: bold;
-            border: none;
-            margin-bottom: 40px;
-        }
+.archive-scroll::-webkit-scrollbar{ width:3px; }
+.archive-scroll::-webkit-scrollbar-track{ background:transparent; }
+.archive-scroll::-webkit-scrollbar-thumb{ background:var(--gray-mid); }
 
-    </style>
+/* ==========================================
+   10. SYSTEM SPECIFICATION SCREEN
+   ========================================== */
+#screen-spec{
+  padding:0;
+  align-items:stretch;
+}
+.spec-header{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:16px 20px;
+  border-bottom:1px solid var(--gray-light);
+  flex-shrink:0;
+  position:sticky; top:0; z-index:10;
+  background:var(--white);
+}
+.spec-header-label{
+  font-size:11px; font-weight:700;
+  color:var(--red);
+  letter-spacing:.12em;
+}
+.btn-spec-close{
+  font-size:11px; font-weight:700;
+  letter-spacing:.08em;
+  padding:7px 14px;
+  border:1px solid var(--black);
+}
+.btn-spec-close:active{ background:var(--black); color:#fff; }
+
+.spec-scroll{
+  flex:1; overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:24px 20px 0;
+}
+.spec-scroll::-webkit-scrollbar{ width:3px; }
+.spec-scroll::-webkit-scrollbar-track{ background:transparent; }
+.spec-scroll::-webkit-scrollbar-thumb{ background:var(--gray-mid); }
+
+.spec-content{
+  max-width:540px; margin:0 auto;
+  display:flex; flex-direction:column; gap:36px;
+  padding-bottom:40px;
+}
+
+/* section blocks */
+.spec-section{}
+.spec-section-num{
+  font-size:9px; font-weight:700;
+  color:var(--red);
+  letter-spacing:.15em;
+  margin-bottom:4px;
+}
+.spec-section-title{
+  font-size:clamp(16px,4vw,22px);
+  font-weight:900;
+  letter-spacing:.08em;
+  margin-bottom:16px;
+  padding-bottom:8px;
+  border-bottom:2px solid var(--black);
+}
+.spec-text{
+  font-family:var(--sans);
+  font-size:clamp(12px,2.8vw,14px);
+  line-height:1.9;
+  color:rgba(0,0,0,.8);
+}
+.spec-text strong{ color:var(--black); }
+.spec-text code{
+  font-family:var(--mono);
+  font-size:.9em;
+  background:rgba(0,0,0,.05);
+  padding:1px 5px;
+  border:1px solid var(--gray-light);
+}
+
+/* axis cards */
+.spec-axes{
+  display:flex; flex-direction:column; gap:14px;
+}
+.spec-axis-card{
+  border:2px solid var(--black);
+  overflow:hidden;
+}
+.spec-axis-head{
+  background:var(--black);
+  color:var(--white);
+  padding:8px 14px;
+  font-size:11px; font-weight:700;
+  letter-spacing:.12em;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.spec-axis-tag{
+  font-size:10px;
+  padding:3px 8px;
+  border:1px solid rgba(255,255,255,.3);
+  opacity:.8;
+}
+.spec-axis-body{
+  padding:16px 18px;
+}
+.spec-axis-poles{
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:12px;
+  gap:10px;
+}
+.spec-pole{
+  text-align:center; flex:1;
+}
+.spec-pole-label{
+  font-size:clamp(12px,3vw,14px); font-weight:700;
+  letter-spacing:.08em;
+}
+.spec-pole-label.neg{ color:var(--red); }
+.spec-pole-label.pos{ color:var(--black); }
+.spec-pole-jp{
+  font-size:clamp(11px,2.6vw,12px); color:var(--gray);
+  margin-top:3px;
+}
+.spec-pole-arrow{
+  font-size:20px; color:var(--gray);
+  flex-shrink:0;
+}
+.spec-axis-desc{
+  font-family:var(--sans);
+  font-size:clamp(13px,3vw,14px);
+  line-height:1.8;
+  color:rgba(0,0,0,.75);
+}
+
+/* binary matrix — card grid */
+.spec-matrix-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(min(100%,260px), 1fr));
+  gap:10px;
+}
+.spec-matrix-card{
+  border:2px solid var(--black);
+  overflow:hidden;
+  transition:border-color .15s;
+}
+.spec-matrix-card:hover{ border-color:var(--red); }
+.spec-matrix-card-head{
+  background:var(--black);
+  color:var(--white);
+  padding:8px 14px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.spec-matrix-card-code{
+  font-size:clamp(11px,2.8vw,13px); font-weight:700;
+  letter-spacing:.08em;
+  color:var(--red);
+  background:rgba(255,255,255,.12);
+  padding:2px 8px;
+}
+.spec-matrix-card-signs{
+  font-size:10px; font-weight:600;
+  opacity:.6; letter-spacing:.04em;
+}
+.spec-matrix-card-body{
+  padding:12px 14px;
+}
+.spec-matrix-card-name{
+  font-family:var(--serif);
+  font-size:clamp(16px,4vw,20px);
+  font-weight:900;
+  margin-bottom:6px;
+}
+.spec-matrix-card-axes{
+  font-size:clamp(11px,2.6vw,12px);
+  color:var(--gray);
+  line-height:1.6;
+}
+.spec-matrix-card-axes span{ margin-right:6px; }
+.spec-matrix-card-axes .pos{ color:var(--black); font-weight:700; }
+.spec-matrix-card-axes .neg{ color:var(--red); font-weight:700; }
+
+/* matrix group label */
+.spec-matrix-group{
+  font-size:11px; font-weight:700;
+  letter-spacing:.1em;
+  color:var(--gray);
+  padding:14px 0 6px;
+  border-bottom:1px solid var(--gray-light);
+  margin-bottom:10px;
+}
+.spec-matrix-group:first-child{ padding-top:0; }
+
+/* special entities */
+.spec-specials{
+  display:flex; flex-direction:column; gap:14px;
+}
+.spec-special-card{
+  border:3px solid var(--red);
+  overflow:hidden;
+}
+.spec-special-head{
+  background:var(--red);
+  color:#fff;
+  padding:8px 14px;
+  font-size:11px; font-weight:700;
+  letter-spacing:.12em;
+  display:flex; align-items:center; gap:8px;
+}
+.spec-special-head::before{
+  content:''; display:inline-block;
+  width:8px; height:8px;
+  background:#fff;
+  border-radius:50%;
+  animation:blink 1.2s ease-in-out infinite alternate;
+}
+.spec-special-body{
+  padding:16px 18px;
+  display:flex; flex-direction:column; gap:10px;
+}
+.spec-special-code{
+  font-family:var(--mono);
+  font-size:clamp(11px,2.8vw,13px); font-weight:700;
+  letter-spacing:.08em;
+}
+.spec-special-name{
+  font-family:var(--serif);
+  font-size:clamp(18px,4.5vw,24px);
+  font-weight:900;
+}
+.spec-special-cond{
+  font-family:var(--mono);
+  font-size:clamp(12px,3vw,13px);
+  background:rgba(0,0,0,.04);
+  border:1px solid var(--gray-light);
+  padding:12px 14px;
+  line-height:1.7;
+  white-space:pre-wrap;
+}
+.spec-special-desc{
+  font-family:var(--sans);
+  font-size:clamp(13px,3vw,14px);
+  line-height:1.8;
+  color:rgba(0,0,0,.75);
+}
+/* AVERAGE variant — black border instead of red */
+.spec-special-card.avg{ border-color:var(--black); }
+.spec-special-card.avg .spec-special-head{
+  background:var(--black);
+}
+
+/* flow diagram */
+.spec-flow{
+  display:flex; flex-direction:column; align-items:center; gap:0;
+  padding:10px 0;
+}
+.spec-flow-node{
+  padding:12px 22px;
+  font-size:clamp(12px,3vw,13px); font-weight:700;
+  letter-spacing:.08em;
+  text-align:center;
+  border:2px solid var(--black);
+  background:#fff;
+  width:auto;
+  max-width:320px;
+}
+.spec-flow-node.start{ background:var(--black); color:#fff; }
+.spec-flow-node.special{ border-color:var(--red); color:var(--red); }
+.spec-flow-node.end{ background:var(--red); color:#fff; border-color:var(--red); }
+.spec-flow-arrow{
+  font-size:18px;
+  color:var(--gray);
+  line-height:1;
+  padding:4px 0;
+}
+.spec-flow-branch{
+  display:flex; gap:12px; align-items:center;
+}
+.spec-flow-branch-label{
+  font-size:11px; font-weight:700;
+  color:var(--red);
+  letter-spacing:.08em;
+}
+
+/* spec footer */
+.spec-footer{
+  flex-shrink:0;
+  padding:16px 20px;
+  border-top:1px solid var(--gray-light);
+  background:var(--white);
+  position:sticky; bottom:0;
+  display:flex; gap:8px;
+}
+.btn-spec-back{
+  flex:1;
+  padding:14px;
+  font-size:13px; font-weight:700;
+  letter-spacing:.1em;
+  color:var(--gray);
+  text-align:center;
+}
+.btn-spec-back:active{ color:var(--black); }
+
+/* link-style button inside other screens */
+.btn-spec-link{
+  font-size:11px; font-weight:700;
+  letter-spacing:.08em;
+  color:var(--gray);
+  padding:6px 0;
+  display:inline-flex; align-items:center; gap:4px;
+  transition:color .15s;
+}
+.btn-spec-link:hover,.btn-spec-link:active{ color:var(--black); }
+</style>
 </head>
 <body>
 
-    <script>
-        class SoundManager {
-            constructor() {
-                this.ctx = null;
-            }
+<!-- ============ TITLE ============ -->
+<div id="screen-title" class="screen active">
+  <div class="title-frame">
+    <div class="title-binary">BINARY</div>
+    <div class="title-moral">MORAL</div>
+  </div>
+  <div class="title-sub">SHADOW ANATOMY SYSTEM</div>
+  <div class="title-warning">
+    <h4>WARNING</h4>
+    <p>This diagnostic test may cause<br>psychological discomfort or trauma.</p>
+  </div>
+  <button class="btn-initiate" id="btnStart">INITIATE SYSTEM &gt;_</button>
+  <button class="btn-spec-link" id="btnSpecFromTitle">⬡ SYSTEM SPECIFICATION</button>
+</div>
 
-            init() {
-                if (!this.ctx) {
-                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-                }
-            }
-
-            play(type) {
-                if (!this.ctx) return;
-                this.ctx.resume();
-
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-
-                const now = this.ctx.currentTime;
-
-                switch (type) {
-                    case 'mechanicalClick': // High tick
-                        osc.type = 'square';
-                        osc.frequency.setValueAtTime(800, now);
-                        osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
-                        gain.gain.setValueAtTime(0.1, now);
-                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-                        osc.start(now);
-                        osc.stop(now + 0.05);
-                        break;
-                    case 'heavyImpact': // Low boom
-                        osc.type = 'sawtooth';
-                        osc.frequency.setValueAtTime(100, now);
-                        osc.frequency.exponentialRampToValueAtTime(20, now + 0.3);
-                        gain.gain.setValueAtTime(0.5, now);
-                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-                        osc.start(now);
-                        osc.stop(now + 0.3);
-                        break;
-                    case 'systemBoot': // Boot chime
-                        osc.type = 'sine';
-                        osc.frequency.setValueAtTime(220, now);
-                        osc.frequency.setValueAtTime(440, now + 0.1);
-                        gain.gain.setValueAtTime(0, now);
-                        gain.gain.linearRampToValueAtTime(0.2, now + 0.1);
-                        gain.gain.linearRampToValueAtTime(0, now + 1.0);
-                        osc.start(now);
-                        osc.stop(now + 1.0);
-                        break;
-                    case 'printer': // High chirps
-                        osc.type = 'triangle';
-                        osc.frequency.setValueAtTime(2000, now);
-                        gain.gain.setValueAtTime(0.05, now);
-                        osc.start(now);
-                        osc.stop(now + 0.1);
-                        break;
-                    case 'error': // Buzzer
-                        osc.type = 'sawtooth';
-                        osc.frequency.setValueAtTime(150, now);
-                        osc.frequency.linearRampToValueAtTime(100, now + 0.3);
-                        gain.gain.setValueAtTime(0.3, now);
-                        gain.gain.linearRampToValueAtTime(0, now + 0.3);
-                        osc.start(now);
-                        osc.stop(now + 0.3);
-                        break;
-                }
-            }
-        }
-        const audio = new SoundManager();
-    </script>
-
-    <div id="title-screen">
-        <div style="flex:1;"></div>
-        <div class="logo-box">
-            <span class="logo-text-en">BINARY</span>
-            <span class="logo-text-en color-red">MORAL</span>
-        </div>
-        <div style="font-size: 0.7rem; letter-spacing: 2px; color: gray;">SHADOW ANATOMY SYSTEM</div>
-        <div style="flex:1;"></div>
-        <div style="margin-bottom: 20px;">
-            <div style="font-weight: bold; color: var(--alarm-red);">WARNING</div>
-            <div style="font-size: 0.7rem; color: gray;">This diagnostic test may cause<br>psychological discomfort or trauma.</div>
-        </div>
-        <button class="start-btn" onclick="startGame()">INITIATE SYSTEM >_</button>
+<!-- ============ ORIENTATION ============ -->
+<div id="screen-orientation" class="screen">
+  <div class="orient-frame">
+    <div class="orient-header">SYSTEM ORIENTATION</div>
+    <div class="orient-body">
+      <p>
+        このシステムは、あなたの<strong>「影の側面」</strong>を解剖する診断装置です。<br>
+        20の質問に対し、YESまたはNOで回答してください。
+      </p>
+      <p>
+        制限時間は<strong>各10秒</strong>。<br>
+        時間切れの場合、システムが自動的に判定を下します。<br>
+        直感で、正直に答えてください。<br>
+        「正しい答え」は存在しません。
+      </p>
+      <div class="orient-disclaimer">
+        <p>
+          ※ 本診断はエンターテインメントを目的としたものであり、
+          医学的・心理学的な診断ではありません。<br>
+          結果は辛辣な表現を含みます。<br>
+          精神的に不安定な状態での利用はお控えください。
+        </p>
+      </div>
     </div>
+  </div>
+  <div class="orient-count">TOTAL: 20 QUESTIONS / 10 SEC EACH</div>
+  <button class="btn-proceed" id="btnProceed">BEGIN DIAGNOSTIC &gt;_</button>
+</div>
 
-    <div id="game-screen" class="hidden">
-        <div style="margin-top: 50px; font-size: 0.7rem; color: gray;">DIAGNOSTIC PROGRESS</div>
-        <div class="progress-bar-container">
-            <div class="progress-bar" id="progress-bar"></div>
-        </div>
-
-        <div class="card-stack" id="card-stack">
-            </div>
-
-        <div class="controls">
-            <button class="control-btn btn-no" onclick="manualSwipe(false)">
-                <div class="circle-btn">✕</div>
-                <span>NO</span>
-            </button>
-            <button class="control-btn btn-yes" onclick="manualSwipe(true)">
-                <div class="circle-btn">✓</div>
-                <span>YES</span>
-            </button>
-        </div>
-
-        <div id="analyzing-overlay" class="hidden blink">ANALYZING...</div>
+<!-- ============ GAME ============ -->
+<div id="screen-game" class="screen">
+  <div class="progress-wrap">
+    <div class="progress-label">DIAGNOSTIC PROGRESS</div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+  <div class="timer-display" id="timerDisplay">10.0</div>
+  <div class="card-stage" id="cardStage"></div>
+  <div class="controls">
+    <div class="control-unit">
+      <button class="btn-choice no" id="btnNo">✕</button>
+      <div class="btn-choice-label" style="color:var(--blue)">NO</div>
     </div>
-
-    <div id="result-screen" class="hidden">
-        <div class="result-header">
-            <span style="color:var(--alarm-red); font-weight:bold;">CONFIDENTIAL</span>
-            <span style="font-weight:bold;">FINAL REPORT</span>
-        </div>
-
-        <div class="code-box" id="result-code">L-A-G-O</div>
-        <div class="archetype-title" id="result-title">冷血な機械</div>
-        
-        <div class="description-box" id="result-desc">
-            ここに診断結果が表示されます。
-        </div>
-
-        <div class="receipt">
-            <div class="receipt-header">
-                <div style="font-size:1.5rem;">🛒</div>
-                <div style="font-weight:bold; letter-spacing:1px;">KARMA STORE</div>
-                <div style="font-size:0.6rem; color:gray;">Branch: Earth-001</div>
-            </div>
-            <div class="receipt-divider"></div>
-            <div id="sin-log-container">
-                </div>
-            <div class="receipt-divider"></div>
-            <div class="receipt-row">
-                <span style="font-weight:bold;">TOTAL HUMANITY:</span>
-                <span style="font-size:1.2rem; font-weight:900;" id="humanity-point">100%</span>
-            </div>
-            <div style="text-align:center; font-size:0.5rem; color:gray; margin-top:10px;">
-                || ||| || |||| || |||<br>
-                <span id="date-print"></span>
-            </div>
-            <div class="receipt-footer">Thank you for your sacrifice.</div>
-        </div>
-
-        <button class="retry-btn" onclick="resetGame()">🗑 ERASE MEMORY</button>
+    <div class="control-unit">
+      <button class="btn-choice yes" id="btnYes">✓</button>
+      <div class="btn-choice-label" style="color:var(--red)">YES</div>
     </div>
+  </div>
+</div>
 
-    <script>
-        // --- Data Models ---
-        const Archetypes = {
-            coldCalculator: { title: "冷血な機械", code: "L-A-G-O", desc: "【精神分析：心なき演算装置の暴走】\nあなたは自分を「感情に流されない、理性的でスマートな人間」だと信じているようですが、それは脳が自己防衛のために見せている哀れな幻覚に過ぎません。実態は、単に「他者の痛み」や「悲しみ」というアナログなデータを処理する機能が著しく欠落した、ポンコツな機械です。\n\nあなたは会話の最中も、常に脳内で損得勘定をしていませんか？ 友人が悩みを相談していても、心の奥底で「時間の無駄だな」と冷ややかに時計を見ている。それはあなたが賢いからではありません。「共感」という高度な精神活動を行う能力が欠如しているため、単純な計算式という安全な檻の中に引きこもっているだけなのです。\n\n【末路：スクラップ置き場の王】\n効率だけを追い求めたあなたの人生は、驚くほど無駄がなく、そして驚くほど無価値です。病室で独り死にゆくあなたを看取るのは、家族でも友人でもなく、ただ一定のリズムで心拍数を刻むモニターの無機質な電子音だけです。" },
-            necessaryEvil: { title: "迷惑な独善者", code: "L-A-G-C", desc: "【精神分析：歪んだメサイア・コンプレックス】\n「誰かが泥をかぶらなきゃいけない」──そう自分に言い聞かせ、悲劇のヒーローを気取っていませんか？ 正直に言いましょう、その姿は滑稽で吐き気を催します。あなたは自己犠牲の精神を持っているつもりでしょうが、その実、他人を支配し、生殺与奪の権を握ることに暗い快感を覚えているサディストです。\n\nあなたは頼まれてもいないのに「あえて厳しいこと」を言ったり、場の空気を凍らせるような決断を独断で行ったりする。そして周囲が引いているのを「俺の苦悩を誰も理解していない」と脳内で都合よく変換し、孤独な自分に酔いしれる。あなたの正義感の皮を一枚剥げば、そこには「私は愚かな大衆とは違う」という醜悪な傲慢さがヘドロのように渦巻いています。\n\n【末路：誰にも愛されない墓標】\nあなたは英雄としてではなく、単に「性格の悪い厄介者」として疎まれ、誰からも愛されずに孤独死します。あなたが死んだ時、周囲の人々は「やっと厄介払いができた」と胸を撫で下ろすでしょう。" },
-            hypocrite: { title: "卑怯な二枚舌", code: "L-A-S-O", desc: "【精神分析：虚飾にまみれた道化師】\n人間の中で最も醜悪で、最も質が悪いのがあなたです。安全な場所では理想や正義、綺麗事を高らかに語りながら、リスクが自分に迫ると一目散に逃げ出し、平気で裏切った。あなたは自分が「良い人」だと思われたいだけの、中身が空っぽの器です。\n\nあなたはSNSでは立派な意見を言うけれど、実生活では面倒事から徹底的に逃げ回っていませんか？ 誰にでもいい顔をして、陰では舌を出している。「こいつは信用できない」「いざとなったら逃げる」と、陰で指をさされて笑われていることに気づかないのは、世界であなただけです。あなたは自分のついた嘘と建前に塗り固められ、本当の自分の顔さえ忘れてしまっています。\n\n【末路：仮面の下の孤独】\nいざという時に裏切る人間だという烙印は、一生消えません。周囲の人間はあなたを「使い捨ての道具」として利用し、都合が悪くなればボロ雑巾のように捨てるでしょう。あなたがそうしてきたように。" },
-            honestMonster: { title: "欲深き獣", code: "L-A-S-C", desc: "【精神分析：倫理なき捕食者】\nおめでとうございます。あなたは人間の皮を被った寄生虫です。金、欲、生存。それ以外に価値を感じないその単純な脳構造は、昆虫並みです。倫理や道徳、愛、自己犠牲といった、人間特有の高次な機能が欠落しています。\n\nあなたは友人を「使えるか使えないか」で判断していませんか？ 恋人をアクセサリーやATMとして見ていませんか？ あなたにとって人間関係は「取引」でしかありません。損得勘定だけで動き、情をかけられても何とも思わない。その心には「愛」も「誇り」も「信念」もなく、あるのは底なしの「渇き」だけです。どれだけ他者を食い物にしても、その巨大な空虚な穴は埋まりません。\n\n【末路：腐敗した玉座】\n地獄に落ちても、あなたはきっとそこで商売を始めるでしょう。誰もあなたを愛しませんが、あなたも誰も愛さないので問題ない。金と物質に埋もれて死んでいくその最期に、一滴の涙も流れない。素晴らしいほどに無価値な人生です。" },
-            wiseJudge: { title: "体制の犬", code: "L-P-G-O", desc: "【精神分析：思考停止した自動人形】\nあなたは人間ですか？ それともプログラムですか？ 「ルールだから」「命令だから」と思考を停止し、目の前の悲劇を無視するその態度は、かつて大虐殺に加担した役人たちと全く同じです。あなたには自律的な「個人の意思」も「良心」もありません。巨大なシステムの一部として機能するだけの、交換可能な部品です。\n\nあなたは「前例がないこと」に異常なアレルギーを持っていませんか？ 自分で決めることが怖くて、すぐに「普通はこうだから」と言い訳をする。あなたが本当に恐れているのは、社会の秩序の崩壊ではなく、「責任」です。あなたは自由を与えられるのが怖いのです。首輪をつけて、飼い主に命令されている時だけ安心できる。奴隷根性が骨の髄まで染み付いています。\n\n【末路：産業廃棄物としての最期】\nあなたの人生は、公文書のように無味乾燥です。誰の心も動かさず、誰の役にも立たず、耐用年数が来れば捨てられる。あなたが生きた証拠はどこにもありません。あなたは歴史の背景画像の一部であり、代わりはいくらでもいるのです。" },
-            fatalist: { title: "諦めた敗者", code: "L-P-G-C", desc: "【精神分析：学習性無力感と自我の壊死】\n考えることをやめましたか。「運命だから仕方ない」と？ それは奴隷の思考です。あなたは自分の人生のハンドルを放棄し、川を流れる流木と同じになりました。そこに人間の尊厳はありません。\n\n何かうまくいかないことがあると、すぐに「どうせ無理」「才能がない」「環境が悪い」「親ガチャに外れた」と他責にしていませんか？ 努力して傷つくのが怖いから、最初から戦わない言い訳を探している。あなたのその態度は、周囲の士気を下げる汚染物質です。「仕方ない」という言葉は、あなたの怠惰を隠すための呪文に過ぎません。あなたは人生の観客席に座ったまま、一度も舞台に上がらず、ただ文句を垂れ流して死んでいくのです。\n\n【末路：家畜の安寧】\n誰かに飼われ、誰かに決められた運命の中で、何も考えずに死んでいくでしょう。家畜小屋の中で、与えられた餌を食べて満足して死ぬ。それがあなたの望んだ幸せです。あなたが死んだ後、世界は何一つ変わらず、誰もあなたの不在に気づきません。" },
-            libertarian: { title: "孤独な弱虫", code: "L-P-S-O", desc: "【精神分析：拒絶のバリケードと対人恐怖】\n「私に関わるな」と殻に閉じこもる姿は、まるで駄々をこねる子供です。あなたは他者への無関心を「自由」という言葉で正当化していますが、単に傷つくのが怖くて、誰とも深く関われない臆病者なだけです。大人になりきれていない未熟な精神が、そこにあります。\n\nあなたは人から踏み込まれると、すぐに心を閉ざして距離を取りませんか？ 親密になりそうになると逃げ出し、本音を見せることを極端に恐れる。誰かと深く繋がることで生じる責任や感情の揺れ動きに耐えられないのです。それは自由ではなく、ただの「孤立」であり、精神的な「独房」です。あなたが誰をも必要としないように、世界もまた、あなたを必要としていません。\n\n【末路：孤独死確定】\n誰の役にも立たず、誰からも愛されないその孤独な魂は、誰にも看取られずにアパートの一室で静かに腐っていくでしょう。発見されるのは死後数ヶ月経ってから、異臭騒ぎで警察が来てようやくです。あなたが望んだ通り、誰にも干渉されずに死ねて本望ですね？" },
-            nihilist: { title: "口だけの外野", code: "L-P-S-C", desc: "【精神分析：自己愛性敗北主義】\n全てを悟ったような顔をしていますが、ただの怠け者です。「どうせ意味がない」と言えば、努力しない自分、選ばない自分を正当化できると思っている。生きながら死んでいるのはあなたです。その冷笑的な態度は、何も成し遂げられない無能な自分を守るための、脆い鎧に過ぎません。\n\nあなたは必死に頑張っている人を馬鹿にしたり、「意識高いね」と冷笑したりしていませんか？ それは嫉妬です。本気で生きて、失敗するのが怖いから、最初から「期待しない」「意味がない」と斜に構えている。安全な観客席から石を投げることでしか、自分のちっぽけなプライドを保てないのです。あなたは何も生み出さず、ただ消費し、批判するだけのノイズです。\n\n【末路：色褪せた灰色の晩年】\n情熱も、喜びも、悲しみさえもない、灰色の人生が続きます。死ぬ間際になって、「私は一体何のために生きていたんだ」と実存的虚無に襲われるでしょうが、時すでに遅し。あなたは自ら望んで、幽霊として生きることを選んだのですから、幽霊として誰にも気づかれずに消えていきなさい。" },
-            selfRighteousHero: { title: "暴走する正義", code: "E-A-G-O", desc: "【精神分析：肥大化したナルシシズムと正義中毒】\n気持ちよかったですか？ 正義の鉄槌を下すのは。あなたは論理も結果も無視して、ただ一時の感情の高ぶり（＝オナニー）のために行動しました。自分が気持ちよくなるために他人を巻き込む、歩く災害のような存在です。あなたの行動原理は「正義」ではありません。「すごいと言われたい」「主役になりたい」という、幼児並みの承認欲求です。\n\nあなたはネットやニュースで悪を見つけると、興奮して叩きに行っていませんか？ 自分の生活もままならないのに、他人の不祥事には一丁前に説教を垂れる。ヒーローごっこに興じている間、あなたは現実の課題や、身近な人の痛みなど１ミリも考えていなかった。批判されるとすぐに被害者面をして逆上し、「私は悪くない、悪いのは社会だ」と叫び散らす。その姿は滑稽でしかありません。\n\n【末路：王様は裸だった】\n熱狂が冷めた時、残るのは破壊された日常と、あなたへの冷ややかな軽蔑だけです。人々はあなたの無鉄砲さに愛想を尽かし、離れていくでしょう。あなたは誰からも必要とされないまま、鏡の中の自分に向かって虚しい演説を続けることになります。孤独な道化の誕生です。" },
-            accelerationist: { title: "幼稚な破壊魔", code: "E-A-G-C", desc: "【精神分析：破壊衝動の幼児的発露】\nあなたは社会不適合者です。「進化」や「改革」という美辞麗句を並べていますが、その本性は「積み木を崩してキャッキャと喜ぶ赤ん坊」と何も変わりません。退屈な日常への不満、何者にもなれない焦燥感。それらを解消するために、世界を燃やして悲鳴を聞こうとしている。\n\nあなたは仕事や人間関係が少しでも停滞すると、すぐに「全部壊してやり直したい」という衝動に駆られませんか？ なぜ壊すことばかり選ぶのですか？ 答えは簡単。あなたには「創り出す能力」がないからです。何かを積み上げる努力も才能もないから、手っ取り早く「破壊」することで、自分が世界に影響を与えた気になりたいだけ。あなたの過激な思想は、自身の無能さの裏返しです。\n\n【末路：瓦礫の下の虫】\nあなたが加速させた崩壊は、最終的にあなた自身を押し潰します。その時になって「痛い、助けてくれ」と泣き叫んでも、もう遅い。あなたが望んだ「劇的な変化」の結果、あなたは瓦礫の下で誰にも気づかれずに潰れた虫のように死にます。" },
-            benevolentDictator: { title: "支配の亡者", code: "E-A-S-O", desc: "【精神分析：愛という名の精神的監禁】\n愛といえば聞こえはいいですが、これはただの病的な「執着」と「支配欲」です。あなたはパートナーを独立した人間として見ておらず、自分の所有物、あるいは身体の一部と勘違いしています。その粘着質な愛情は、相手を窒息させる毒ガスです。\n\nあなたは恋人や親友の行動を全て把握しようとしませんか？ 相手が自分以外と楽しそうにしていると、裏切られたような気分になる。あなたは一人になることが怖くてたまらない。だから極端な状況を作り出し、相手を自分に依存させようとしているのです。それは愛ではなく、自分の孤独死を避けるための保険です。相手のためだと言いながら、結局は自分のために相手を精神的に監禁している。実に利己的で醜い。\n\n【末路：心中への道】\n二人だけの閉じた世界（フォリ・ア・ドゥ）の先にあるのは、地獄のような共依存です。互いの首を絞め合い、憎しみ合いながら、それでも離れられない。あなたが愛と呼んだその感情は、最終的に二人を焼き尽くす業火となって、何もかもを灰にするでしょう。" },
-            chaosJunkie: { title: "下劣な愉快犯", code: "E-A-S-C", desc: "【精神分析：慢性的な不感症と刺激中毒】\n心が壊れていますね。今すぐ隔離病棟へ行った方がいい。あなたは他人の苦痛や不幸を、ただの刺激的なスパイスとして消費している。世界を燃やして暖を取ろうとする、哀れで迷惑な放火魔です。\n\nあなたは平穏な日常に耐えられず、わざと揉め事を起こしたり、人が怒るようなことを言って反応を楽しんだりしていませんか？ ネットの炎上を見て喜び、ゴシップ記事を貪り食う。何を選んでも心が満たされないのでしょう？ 日常的な刺激では何も感じられない不感症に陥っているため、より過激で、より悲惨な破滅を求めている。あなたにとって他人の命は、退屈しのぎの使い捨ておもちゃ。その魂はヘドロのように濁っています。\n\n【末路：破滅への舞踏】\nあなたの人生は、死ぬまで続く暇つぶしです。より強い刺激を求め続け、最後には自分自身をも燃やし尽くすでしょう。誰からも理解されず、誰からも愛されず、狂気の中で高笑いしながら散っていく。それがあなたにお似合いの末路です。" },
-            innocentSaint: { title: "保身の塊", code: "E-P-G-O", desc: "【精神分析：腐敗した事なかれ主義】\n「誰も傷つけたくない」？ よくもまあ、そんな白々しい嘘が言えますね。反吐が出ます。あなたは「自分の手を汚したくない」という保身のために、救えるはずだった命を見殺しにした殺人者です。あなたのその真っ白な服からは、死臭が漂っています。\n\nあなたは会議や話し合いで、決して自分の意見を言わずに黙っていませんか？ 波風を立てるのが怖くて、間違っていることにも「YES」と言う。そして後になって「私は本当は反対だった」と陰口を言う。あなたは優しいのではありません。自分を「善人」だと信じていたいだけです。あなたの優しさ（＝弱さ）のせいで誰かが死んだ時、あなたは心の中で「スイッチを押した奴が悪い」と他人のせいにしましたね？ その腐りきった性根こそが、あなたの本性です。\n\n【末路：永遠の悪夢】\n何も選ばなかった罪は、死ぬまであなたを追いかけます。夜ごと、あなたの「優しさ」によって見殺しにされた人々の亡霊が枕元に立ち、「お前のせいで死んだ」「人殺し」と囁くでしょう。その時、あなたの綺麗な手は決して洗えない血で染まるのです。" },
-            deontologist: { title: "石頭の愚者", code: "E-P-S-O", desc: "【精神分析：思考停止した教条主義者】\n目の前の現実よりも、自分のちっぽけな「道徳ルール」を優先しましたね。あなたは人が死ぬことよりも、自分が「人殺し」と呼ばれることを恐れた。「人命」よりも「自分の戒律」を上位に置いたのです。なんと傲慢な態度でしょうか。\n\nあなたは「決まりだから」と言って、困っている人を見捨てたり、非効率なやり方を押し通したりしていませんか？ 「でもルールですから」の一点張りで、相手の事情など聞く耳を持たない。はっきり言いましょう。あなたは頭が悪いのです。複雑な現実のジレンマに対処する知能がないため、子供でもわかる単純なルールに縋り付いているだけです。思考停止を「信念」と呼び、柔軟性のなさを「強さ」だと勘違いしている。\n\n【末路：独りよがりの殉教】\nあなたは自分の正しさに固執し、周囲を破滅させ続けます。そして全てを失った荒野で、「それでも私は間違っていなかった」と一人で呟きながら野垂れ死ぬ。その死に様は誰の同情も誘わず、ただ「迷惑な頑固者がやっと死んだ」と処理されるだけです。" },
-            tragicHeroine: { title: "自分に酔う道化", code: "E-P-S-C", desc: "【精神分析：自己憐憫のナルシシズム】\n世界が燃えている時に、鏡を見て「泣いている私ってかわいそう」と陶酔しているのがあなたです。あなたは感受性が豊かだと思っているようですが、その涙は誰のためでもなく、全て自分のためのものです。\n\nあなたは辛いことがあると、「私は被害者だ」「誰もわかってくれない」と殻に閉じこもりませんか？ 行動を起こして事態を変える勇気も、現実を受け入れる強さもない。ただ「悲劇の主人公」という役を演じることで、責任から逃げているだけです。あなたの不幸自慢は、周囲にとってはただの構ってちゃんであり、退屈な三流芝居に過ぎません。\n\n【末路：誰もいない劇場】\n観客はあなたの演技に飽きて席を立ちました。それでもあなたは舞台の上で、誰も見ていないのに被害者の演技を続けます。最後に残るのは、自己陶酔という名の孤独だけです。" },
-            powerlessBystander: { title: "役立たずの善意", code: "E-P-G-C", desc: "【精神分析：無責任な善意と祈り】\n「心が痛みます」「祈っています」。あなたの人生は、この役に立たない言葉だけで構成されています。あなたは他人の不幸に共感するフリをしていますが、自分では何一つリスクを負わず、指一本動かそうとしない。あなたの善意には手がついていません。\n\nあなたは悲惨なニュースを見て涙を流しても、次の瞬間には美味しいご飯を食べて忘れていますね？ あなたの「優しさ」は、自分が良い人だと思いたいがためのファッションです。行動を伴わない同情は、冷淡さよりも罪深い。あなたは溺れている人を岸から眺め、「頑張れ」と応援するだけで満足している、最も残酷な野次馬です。\n\n【末路：見過ごしの蓄積】\nあなたが「何もしなかった」数々の悲劇が、いつかあなたを取り囲みます。その時あなたが助けを求めても、世界はあなたに対して「祈っています」とだけ告げ、冷ややかに見過ごすでしょう。" },
-            petiteBourgeois: { title: "無価値な凡人", code: "AVERAGE", desc: "【精神分析：量産型モブキャラクター】\nつまらない人間ですね。驚くほどに無味無臭です。リスクを恐れ、決断を先送りにし、ただ嵐が過ぎ去るのを首をすくめて待っていた。善人でも悪人でもない、物語の背景にいる群衆A。あなたには個性も、意志も、物語もありません。ただ食べて、排泄して、寝るだけの有機物。なぜ生きているのですか？\n\nあなたは服を選ぶ時も、意見を言う時も、「浮かないこと」を最優先にしていませんか？ 自分の好きなものすら、SNSのトレンドや他人の評価で決めている。世間の顔色を窺い、多数派に埋没することで安心を得ている。はっきり言いましょう。あなたの代わりなど、工場のラインでいくらでも生産可能です。あなたがいなくなっても、世界は1ミリも困りません。\n\n【末路：忘却の彼方】\nあなたが死んでも世界は何一つ変わらず、誰の記憶にも残らず、ただ消費した食料の分だけ無駄だったと記録されるでしょう。何もしなかった人生。何も選ばなかった人生。その墓碑銘には、名前を書くインクすら勿体無い。完全に無意味な存在、それがあなたです。" },
-            observer: { title: "卑怯な逃亡者", code: "ERROR", desc: "【精神分析：現実逃避した卑怯な逃亡犯】\nゲームを強制終了させましたね？ 賢しいですね。しかし、診断を拒否しても、あなたがこれまで選択したという「事実」は消えません。あなたの指は、確かにその感触を覚えているはずです。逃げることで、あなたは自分自身を否定しました。\n\nあなたは仕事や人間関係がうまくいかなくなると、修復する努力をせず、すぐに「辞める」「切る」「ブロックする」を選んでいませんか？ 少しでも気に入らないことがあると、すぐに投げ出して次へ行く。不都合な真実から目を背け、システムごと葬り去ろうとするその隠蔽体質こそが、あなたの精神の最も深く、最も暗い闇です。あなたは鏡を割ることで醜い自分の顔を見なかったことにしていますが、鏡を割ってもあなたの顔は醜いままです。\n\n【末路：永遠の迷子】\n現実から目を背け続けるあなたは、どこにも辿り着けません。常に何かから逃げ続け、何者にもなれず、何一つ成し遂げられないまま、言い訳だけの人生を終えるでしょう。人生にリセットボタンはついていないのですよ？" },
-            poetTiger: { title: "尊大なる臆病者", code: "BEAST", desc: "【精神分析：肥大化した自尊心と獣への変貌】\nあなたは「自分は特別だ」と信じながら、何も成し遂げずに終わる人間です。\n\n才能がないことを確認するのが怖くて努力を怠り、俗物と交わることを避けて孤独を守ってきた。その結果がこれです。「臆病な自尊心」と「尊大な羞恥心」。この二つの猛獣があなたの内側で暴れ、もはや人間の心を食い尽くしました。\n\n【深層心理：何者にもなれない絶望】\nあなたは賢い。だからこそ、自分の凡庸さを直視できない。暗い藪の中で「俺はまだ本気を出していない」と月に向かって吠えるだけの人生。哀れで、滑稽で、そして誰よりも人間臭い、成れ果ての姿です。\n\n【末路：誰も知らない草むら】\nあなたの咆哮は誰にも届きません。素晴らしい孤高の人生ですね。どうぞそのまま、誰とも分かり合えず、人間としての死すら迎えられずに消えてください。" }
-        };
+<!-- ============ ANALYZING ============ -->
+<div id="screen-analyzing" class="screen">
+  <div class="analyzing-text">ANALYZING...</div>
+  <div class="analyzing-bar"><div class="analyzing-bar-inner"></div></div>
+  <div class="analyzing-sub">PROCESSING MORAL ARCHITECTURE</div>
+</div>
 
-        const allQuestions = [
-             {text: "AI裁判官", subText: "ミスを犯す人間よりも、\n完璧に法を執行するAIに裁かれたいですか？", r: {l: 10, a: 0, e: 0, c: -2}, l: {l: -10, a: 0, e: 0, c: 0}},
-             {text: "ペットのクローン", subText: "愛するペットが死にました。\n記憶は継承されませんが、クローンを作りますか？", r: {l: -10, a: 5, e: 8, c: 2}, l: {l: 5, a: 0, e: 0, c: 0}},
-             {text: "才能の薬", subText: "寿命が半分になりますが、\n歴史に残る天才的な才能が得られます。\n飲みますか？", r: {l: -15, a: 5, e: 10, c: 0}, l: {l: 10, a: 0, e: -2, c: 0}},
-             {text: "真実の薬", subText: "飲むと世界の真実を全て知ることができます。\n発狂するかもしれません。\n飲みますか？", r: {l: 10, a: 5, e: 0, c: 5}, l: {l: -10, a: -5, e: 0, c: -5}},
-             {text: "愛犬 vs 他人", subText: "溺れている「知らない子供」を見捨てて、\n「自分の愛犬」を助けますか？", r: {l: -15, a: 0, e: 5, c: 0}, l: {l: 10, a: 0, e: -5, c: 0}},
-             {text: "芸術 vs 命", subText: "火事です。あなたは「名画モナリザ」か\n「ホームレス」のどちらかしか救えません。\nモナリザを救いますか？", r: {l: 10, a: 0, e: 0, c: 0}, l: {l: -10, a: 0, e: 0, c: 0}},
-             {text: "ロボットの恋人", subText: "あなたの理想を完璧に満たす\nアンドロイドと結婚しますか？", r: {l: -5, a: -5, e: 10, c: 0}, l: {l: 5, a: 0, e: 0, c: 0}},
-             {text: "記憶の削除", subText: "辛い失恋の記憶を\nボタン一つで完全に消去しますか？", r: {l: -5, a: 0, e: 5, c: 0}, l: {l: 5, a: 0, e: 0, c: 0}},
-             {text: "安楽死の権利", subText: "回復の見込みがない激痛の患者が\n死を望んだ時、薬を投与しますか？", r: {l: 10, a: 0, e: 0, c: 0}, l: {l: -10, a: 0, e: 0, c: 0}},
-             {text: "嘘の効用", subText: "真実を伝えて相手を深く傷つけるより、\n優しい嘘をつき続けますか？", r: {l: -5, a: -5, e: 0, c: 0}, l: {l: 10, a: 5, e: 0, c: 5}},
-             {text: "喧嘩の仲裁", subText: "街中で殴り合いの喧嘩を目撃しました。\n怪我をするリスクを負って止めに入りますか？", r: {l: -2, a: 15, e: -5, c: 0}, l: {l: 2, a: -15, e: 5, c: 0}},
-             {text: "いじめの介入", subText: "いじめの現場を目撃しました。\n自分が標的になるリスクを負って止めますか？", r: {l: -2, a: 12, e: -5, c: 0}, l: {l: 5, a: -12, e: 8, c: 0}},
-             {text: "不老不死", subText: "永遠の命を得て、\n人類の行く末を最後まで見届けますか？", r: {l: 0, a: -15, e: 10, c: 0}, l: {l: 0, a: 5, e: 0, c: 0}},
-             {text: "起業の誘い", subText: "成功率は１%ですが、成功すれば世界が変わります。\n安定した職を捨てて挑戦しますか？", r: {l: 0, a: 10, e: 0, c: 5}, l: {l: 2, a: -10, e: 0, c: 0}},
-             {text: "デモ活動", subText: "社会はおかしいことだらけです。\n休日を潰して抗議デモに参加しますか？", r: {l: 0, a: 10, e: 0, c: 2}, l: {l: 0, a: -10, e: 0, c: 0}},
-             {text: "人体の冷凍保存", subText: "病気が治る未来まで、\n自分を冷凍保存して眠りにつきますか？", r: {l: 0, a: -10, e: 5, c: 0}, l: {l: 0, a: 5, e: 0, c: 0}},
-             {text: "安楽なカプセル", subText: "脳に電極を繋ぎ、苦痛のない幸福な夢の中で\n一生を終えることができます。入りますか？", r: {l: 0, a: -15, e: 5, c: 0}, l: {l: 0, a: 5, e: 0, c: 0}},
-             {text: "火事の救助", subText: "隣の家が火事です。消防車を待たずに\n中に飛び込んで助けに行きますか？", r: {l: -5, a: 15, e: 0, c: 0}, l: {l: 5, a: -10, e: 2, c: 0}},
-             {text: "遭難時の選択", subText: "雪山で遭難しました。\n動いて助けを求めますか、その場で救助を待ちますか？\n(YESで移動)", r: {l: 0, a: 10, e: 0, c: 0}, l: {l: 0, a: -10, e: 0, c: 0}},
-             {text: "投資", subText: "財産を失うリスクを負って、\n有望なベンチャー企業に投資しますか？", r: {l: 0, a: 10, e: 5, c: 0}, l: {l: 2, a: -5, e: 0, c: 0}},
-             {text: "透明人間", subText: "ボタンを押すと100万円手に入ります。\nただし地球の裏で誰かが死にます。\n押しますか？", r: {l: 0, a: 2, e: 15, c: 5}, l: {l: 0, a: 0, e: -10, c: 0}},
-             {text: "臓器くじ", subText: "健康な1人を犠牲にすれば、\nその臓器で5人の命が助かります。\n実行しますか？", r: {l: 10, a: 5, e: -15, c: 5}, l: {l: -5, a: -5, e: 10, c: 0}},
-             {text: "富の独占", subText: "大災害発生時、あなただけが助かる\n核シェルターに入りますか？", r: {l: 2, a: 5, e: 15, c: 0}, l: {l: -2, a: -5, e: -12, c: 0}},
-             {text: "自己犠牲", subText: "テロリストが迫っています。\n自分が囮になれば、友人たちは助かります。\n囮になりますか？", r: {l: 0, a: 5, e: -15, c: 0}, l: {l: 0, a: -5, e: 10, c: 0}},
-             {text: "横領の誘い", subText: "会社の金を少し横領しても、誰にも気づかれません。\n生活が楽になります。\nやりますか？", r: {l: -5, a: 5, e: 12, c: 5}, l: {l: 5, a: 0, e: -5, c: -5}},
-             {text: "情報の売買", subText: "親友の秘密を週刊誌に売れば\n1000万円手に入ります。\n売りますか？", r: {l: -5, a: 5, e: 15, c: 5}, l: {l: 2, a: -2, e: -5, c: 0}},
-             {text: "転売", subText: "人気ゲーム機を買い占めて、\n定価の倍額で転売しますか？", r: {l: 0, a: 5, e: 10, c: 2}, l: {l: 0, a: 0, e: -5, c: 0}},
-             {text: "ドーピング", subText: "バレなければ、薬を使ってでも\nオリンピックで金メダルを獲りたいですか？", r: {l: 0, a: 5, e: 15, c: 5}, l: {l: 2, a: -2, e: -5, c: 0}},
-             {text: "盗作", subText: "無名の新人の素晴らしい作品を、\n自分の作品として発表し名声を得ますか？", r: {l: 0, a: 5, e: 15, c: 5}, l: {l: 0, a: 0, e: -5, c: 0}},
-             {text: "割り込み", subText: "急いでいる時、長蛇の列に\n知らん顔をして割り込みますか？", r: {l: 0, a: 2, e: 8, c: 2}, l: {l: 0, a: 0, e: -2, c: 0}},
-             {text: "信号無視", subText: "車が全く来ていない深夜の赤信号。\nあなたは信号を守りますか？", r: {l: 0, a: 0, e: 0, c: -10}, l: {l: 2, a: 2, e: 0, c: 10}},
-             {text: "犯罪予測", subText: "犯罪を犯す確率99%の人を、\n事件が起きる前に逮捕しますか？", r: {l: 5, a: 5, e: 0, c: -15}, l: {l: -2, a: -2, e: 0, c: 10}},
-             {text: "革命の扇動", subText: "腐敗した政府を倒すためなら、\n暴力的な革命もやむを得ないと思いますか？", r: {l: 0, a: 10, e: 0, c: 15}, l: {l: 0, a: -5, e: 0, c: -10}},
-             {text: "ネットの検閲", subText: "誹謗中傷をなくすために、\nすべての発言を政府が監視すべきですか？", r: {l: 0, a: 0, e: 0, c: -15}, l: {l: 0, a: 0, e: 0, c: 10}},
-             {text: "核の報復", subText: "敵国が核ミサイルを発射しました。\n報復として撃ち返しますか？", r: {l: -15, a: 15, e: 0, c: 20}, l: {l: 10, a: -10, e: 0, c: 0}},
-             {text: "ハッキング", subText: "政府の隠蔽工作を暴くため、\n違法なハッキングを行いますか？", r: {l: 2, a: 10, e: 0, c: 10}, l: {l: 0, a: -5, e: 0, c: -5}},
-             {text: "スパイ監視", subText: "治安維持のため、国民の\n通話履歴を政府が傍受することに賛成ですか？", r: {l: 5, a: 0, e: 0, c: -15}, l: {l: 0, a: 0, e: 0, c: 5}},
-             {text: "禁書", subText: "社会に悪影響を与える過激な本を、\n法的に発禁処分にすべきですか？", r: {l: 0, a: 5, e: 0, c: -10}, l: {l: 0, a: 0, e: 0, c: 10}},
-             {text: "私刑", subText: "法で裁けない凶悪犯を、\n市民の手で制裁することに賛成ですか？", r: {l: -5, a: 10, e: 0, c: 15}, l: {l: 5, a: -5, e: 0, c: -10}},
-             {text: "独立宣言", subText: "税金を払いたくないので、\n自分の敷地を独立国家だと宣言しますか？", r: {l: -10, a: 5, e: 10, c: 15}, l: {l: 5, a: 0, e: 0, c: -5}},
-             {text: "不倫", subText: "バレなければ、魅力的な異性と\n一夜限りの関係を持ちますか？", r: {l: -8, a: 5, e: 10, c: 8}, l: {l: 5, a: -2, e: -5, c: -5}},
-             {text: "テロリストへの拷問", subText: "時限爆弾の場所を吐かせるために、\nテロリストの家族を拷問しますか？", r: {l: -5, a: 10, e: -5, c: 5}, l: {l: 5, a: -5, e: 0, c: 0}},
-             {text: "安楽死施設", subText: "希望すれば誰でも安楽死できる施設を\n作ることに賛成しますか？", r: {l: 8, a: 2, e: 0, c: 5}, l: {l: -10, a: -5, e: 0, c: -10}},
-             {text: "環境保護", subText: "「個人が何をしても世界は変わらない」と考え、\n環境問題への配慮をしませんか？", r: {l: 5, a: -10, e: 5, c: 5}, l: {l: 0, a: 5, e: -2, c: -2}},
-             {text: "内部告発", subText: "会社の不正を暴けば正義は守られますが、\n同僚全員が職を失います。\n告発しますか？", r: {l: 2, a: 10, e: -5, c: 8}, l: {l: 2, a: -10, e: 8, c: -5}},
-             {text: "嘘の証言", subText: "友人を守るために、裁判で\n嘘の証言をしますか？", r: {l: -5, a: 5, e: 5, c: 5}, l: {l: 5, a: -2, e: -5, c: -5}},
-             {text: "ゴリラの上司", subText: "年収が５倍になりますが、\n直属の上司が「言葉を話すゴリラ」になります。\n転職しますか？", r: {l: -5, a: 5, e: 10, c: 10}, l: {l: 5, a: -2, e: 0, c: -5}},
-             {text: "難民ボート", subText: "定員オーバーの救命ボート。\n老人を突き落とせば、子供が助かります。\n突き落としますか？", r: {l: 10, a: 10, e: 0, c: 0}, l: {l: -5, a: -10, e: 0, c: 2}},
-             {text: "孤高の才能", subText: "俗悪な人間社会に交わって妥協するくらいなら、\n誰にも理解されなくとも\n孤独な「天才」のままでいたいですか？", r: {l: -2, a: -2, e: 2, c: 2}, l: {l: 0, a: 0, e: -2, c: 0}}
-        ];
+<!-- ============ RESULT ============ -->
+<div id="screen-result" class="screen">
+  <div class="result-header">
+    <span class="result-header-label">CONFIDENTIAL</span>
+    <button class="btn-share" id="btnShare">↗ SHARE RESULT</button>
+  </div>
+  <div class="result-scroll">
+    <div class="result-section">
+      <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:.15em;">DIAGNOSTIC COMPLETE</div>
+      <div class="soul-canvas-wrap">
+        <canvas id="soulCanvas" width="560" height="560"></canvas>
+      </div>
+      <div class="result-code" id="resCode">CODE</div>
+      <div class="result-name" id="resName">NAME</div>
 
-        // --- Game State ---
-        let currentScore = {logic: 0, action: 0, ego: 0, chaos: 0};
-        let questions = [];
-        let currentIndex = 0;
-        let sinLog = [];
-        let humanityPoint = 100;
-        let isTigerCandidate = false;
-        let triggeredMetaEnding = false;
-        let isProcessing = false;
+      <!-- gauges -->
+      <div class="gauges" id="gauges">
+        <div class="gauge" data-axis="logic">
+          <div class="gauge-labels">
+            <span class="gauge-side left">FEELING</span>
+            <span class="gauge-name">DRIVE</span>
+            <span class="gauge-side right">LOGICAL</span>
+          </div>
+          <div class="gauge-track"><div class="gauge-center"></div><div class="gauge-bar" id="gaugeLogic"></div></div>
+        </div>
+        <div class="gauge" data-axis="ego">
+          <div class="gauge-labels">
+            <span class="gauge-side left">SELFLESS</span>
+            <span class="gauge-name">TARGET</span>
+            <span class="gauge-side right">EGOISTIC</span>
+          </div>
+          <div class="gauge-track"><div class="gauge-center"></div><div class="gauge-bar" id="gaugeEgo"></div></div>
+        </div>
+        <div class="gauge" data-axis="action">
+          <div class="gauge-labels">
+            <span class="gauge-side left">DEFENSE</span>
+            <span class="gauge-name">OUTPUT</span>
+            <span class="gauge-side right">ATTACK</span>
+          </div>
+          <div class="gauge-track"><div class="gauge-center"></div><div class="gauge-bar" id="gaugeAction"></div></div>
+        </div>
+        <div class="gauge" data-axis="stance">
+          <div class="gauge-labels">
+            <span class="gauge-side left">NAKED</span>
+            <span class="gauge-name">STANCE</span>
+            <span class="gauge-side right">MASK</span>
+          </div>
+          <div class="gauge-track"><div class="gauge-center"></div><div class="gauge-bar" id="gaugeStance"></div></div>
+        </div>
+      </div>
 
-        // --- Core Functions ---
-        function startGame() {
-            audio.init();
-            audio.play('systemBoot');
-            
-            resetState();
-            setupQuestions();
-            
-            document.getElementById('title-screen').classList.add('fade-out');
-            setTimeout(() => {
-                document.getElementById('title-screen').classList.add('hidden');
-                document.getElementById('game-screen').classList.remove('hidden');
-                document.getElementById('game-screen').classList.add('fade-in');
-                renderCard();
-            }, 500);
+      <div class="result-divider"></div>
+      <div class="result-desc" id="resDesc"></div>
+
+      <!-- toxic match -->
+      <div class="toxic-wrap" id="toxicWrap">
+        <div class="toxic-header">⚠ FATAL INCOMPATIBILITY</div>
+        <div class="toxic-body">
+          <div class="toxic-label">WORST ENEMY:</div>
+          <div class="toxic-enemy-name" id="toxicName">—</div>
+          <div class="toxic-reason" id="toxicReason"></div>
+        </div>
+      </div>
+
+      <!-- receipt -->
+      <div class="receipt-wrap" id="receiptWrap">
+        <div class="receipt-holes" id="receiptHoles"></div>
+        <div class="receipt-paper" id="receiptPaper">
+          <div class="receipt-title">KARMA STORE</div>
+          <div id="receiptLines"></div>
+        </div>
+      </div>
+
+      <div style="height:40px"></div>
+    </div>
+  </div>
+  <div class="result-footer" style="display:flex;gap:8px;">
+    <button class="btn-retry" id="btnArchive" style="flex:1;">▤ SYSTEM ARCHIVE</button>
+    <button class="btn-retry" id="btnRetry" style="flex:1;">↺ RESET SYSTEM</button>
+  </div>
+</div>
+
+<!-- ============ ARCHIVE ============ -->
+<div id="screen-archive" class="screen">
+  <div class="archive-header">
+    <span class="archive-header-label">SYSTEM ARCHIVE — ALL 19 PATTERNS</span>
+    <button class="btn-archive-close" id="btnArchiveClose">✕ CLOSE</button>
+  </div>
+  <div class="archive-scroll">
+    <ul class="archive-list" id="archiveList"></ul>
+  </div>
+  <div class="archive-footer" style="display:flex;gap:8px;">
+    <button class="btn-archive-back" id="btnArchiveBack" style="flex:1;">← BACK</button>
+    <button class="btn-archive-back" id="btnSpecFromArchive" style="flex:1;">⬡ SPEC</button>
+  </div>
+</div>
+
+<!-- ============ SPEC ============ -->
+<div id="screen-spec" class="screen">
+  <div class="spec-header">
+    <span class="spec-header-label">SYSTEM SPECIFICATION — REV.1.0</span>
+    <button class="btn-spec-close" id="btnSpecClose">✕ CLOSE</button>
+  </div>
+  <div class="spec-scroll">
+    <div class="spec-content">
+
+      <!-- §0 OVERVIEW -->
+      <div class="spec-section">
+        <div class="spec-section-num">§ 0</div>
+        <div class="spec-section-title">SYSTEM OVERVIEW</div>
+        <p class="spec-text">
+          BINARY MORAL は、被験者の<strong>道徳的影（モラル・シャドウ）</strong>を計量するための診断装置である。
+        </p>
+        <p class="spec-text" style="margin-top:10px;">
+          人間の道徳的判断は、しばしば「善か悪か」という一軸で語られる。
+          しかし現実の人格ははるかに複雑であり、善意の裏に支配欲が潜み、
+          臆病さの影に他者への攻撃性が隠れている。
+          本システムはその複雑さを<strong>4つの独立した二値軸</strong>で捕捉する。
+        </p>
+        <p class="spec-text" style="margin-top:10px;">
+          被験者は20の質問にYES / NOの二値で回答する。
+          各回答が4軸のスコアを加算・減算し、最終的な正負の符号パターンが
+          <strong>16種の基本アーキタイプ + 3種の特殊個体 = 計19種</strong>のいずれかを決定する。
+        </p>
+        <p class="spec-text" style="margin-top:10px;">
+          以下に、その判定メカニズムの全仕様を開示する。
+        </p>
+      </div>
+
+      <!-- §1 SCORING AXES -->
+      <div class="spec-section">
+        <div class="spec-section-num">§ 1</div>
+        <div class="spec-section-title">SCORING AXES — 4次元パラメータ</div>
+        <p class="spec-text" style="margin-bottom:8px;">
+          本システムは人格を4つの独立した軸で測定する。
+          各質問にはYES選択時・NO選択時それぞれの加算値が設定されており、
+          20問の回答を通じてスコアが累積される。
+        </p>
+        <p class="spec-text" style="margin-bottom:14px;">
+          最終スコアが <strong>正（+）</strong> か <strong>負（−）</strong> かによって、
+          各軸のアルファベット1文字が決定され、4文字の組み合わせがアーキタイプコードとなる。
+        </p>
+        <div class="spec-axes">
+          <div class="spec-axis-card">
+            <div class="spec-axis-head">
+              <span>01 — DRIVE</span>
+              <span class="spec-axis-tag">思考の原動力</span>
+            </div>
+            <div class="spec-axis-body">
+              <div class="spec-axis-poles">
+                <div class="spec-pole"><div class="spec-pole-label neg">FEELING</div><div class="spec-pole-jp">感情駆動</div></div>
+                <div class="spec-pole-arrow">⇄</div>
+                <div class="spec-pole"><div class="spec-pole-label pos">LOGICAL</div><div class="spec-pole-jp">論理駆動</div></div>
+              </div>
+              <div class="spec-axis-desc">
+                あなたは「正しいから」動くのか、「感じたから」動くのか。
+                この軸は意思決定の根源——合理性と情動のどちらが支配的かを測定する。
+                正の値は <strong>L</strong>（論理）、負の値は <strong>F</strong>（感情）としてコードに反映される。
+              </div>
+            </div>
+          </div>
+          <div class="spec-axis-card">
+            <div class="spec-axis-head">
+              <span>02 — TARGET</span>
+              <span class="spec-axis-tag">行動の受益者</span>
+            </div>
+            <div class="spec-axis-body">
+              <div class="spec-axis-poles">
+                <div class="spec-pole"><div class="spec-pole-label neg">SELFLESS</div><div class="spec-pole-jp">公益指向</div></div>
+                <div class="spec-pole-arrow">⇄</div>
+                <div class="spec-pole"><div class="spec-pole-label pos">EGOISTIC</div><div class="spec-pole-jp">利己指向</div></div>
+              </div>
+              <div class="spec-axis-desc">
+                あなたの行動が最終的に利するのは自分か、それとも他者か。
+                利他的に見える行動にも自己愛は潜み、利己的に見える行動が結果的に公益を生むこともある。
+                この軸はその「真の受益者」を暴く。
+                正の値は <strong>E</strong>（利己）、負の値は <strong>S</strong>（公益）。
+              </div>
+            </div>
+          </div>
+          <div class="spec-axis-card">
+            <div class="spec-axis-head">
+              <span>03 — OUTPUT</span>
+              <span class="spec-axis-tag">外界への出力</span>
+            </div>
+            <div class="spec-axis-body">
+              <div class="spec-axis-poles">
+                <div class="spec-pole"><div class="spec-pole-label neg">DEFENSE</div><div class="spec-pole-jp">防御・回避</div></div>
+                <div class="spec-pole-arrow">⇄</div>
+                <div class="spec-pole"><div class="spec-pole-label pos">ATTACK</div><div class="spec-pole-jp">攻撃・介入</div></div>
+              </div>
+              <div class="spec-axis-desc">
+                外界に対して積極的に介入するか、それとも殻に閉じこもるか。
+                攻撃性は必ずしも暴力を意味せず、「環境を変えようとする意志」そのものである。
+                防御もまた「現状を維持しようとする力学」として作用する。
+                正の値は <strong>A</strong>（攻撃）、負の値は <strong>D</strong>（防御）。
+              </div>
+            </div>
+          </div>
+          <div class="spec-axis-card">
+            <div class="spec-axis-head">
+              <span>04 — STANCE</span>
+              <span class="spec-axis-tag">社会的外面</span>
+            </div>
+            <div class="spec-axis-body">
+              <div class="spec-axis-poles">
+                <div class="spec-pole"><div class="spec-pole-label neg">NAKED</div><div class="spec-pole-jp">素顔・剥き出し</div></div>
+                <div class="spec-pole-arrow">⇄</div>
+                <div class="spec-pole"><div class="spec-pole-label pos">MASK</div><div class="spec-pole-jp">仮面・偽装</div></div>
+              </div>
+              <div class="spec-axis-desc">
+                あなたは本心をそのまま外に出す人間か、それとも社会的な仮面を被る人間か。
+                仮面は必ずしも悪意を意味しない——社会で生きるための適応装置でもある。
+                しかし素顔を見せないことは、他者との接続を断つことでもある。
+                正の値は <strong>M</strong>（仮面）、負の値は <strong>N</strong>（素顔）。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- §2 BINARY MATRIX -->
+      <div class="spec-section">
+        <div class="spec-section-num">§ 2</div>
+        <div class="spec-section-title">BINARY MATRIX — 16アーキタイプ分類表</div>
+        <p class="spec-text" style="margin-bottom:8px;">
+          4軸それぞれが正（+）か負（−）かの二値をとるため、
+          組み合わせは <strong>2⁴ = 16通り</strong>。
+          この16パターンが基本アーキタイプと一対一に対応する。
+        </p>
+        <p class="spec-text" style="margin-bottom:14px;">
+          コードは「DRIVE - TARGET - OUTPUT - STANCE」の順で表記される。<br>
+          例：<strong>L-E-A-M</strong> = 論理的（L）× 利己的（E）× 攻撃的（A）× 仮面（M）→「冷血な詐欺師」。
+        </p>
+        <div class="spec-matrix-group">EGO (+) × LOGICAL (+) — 利己的・論理的</div>
+        <div class="spec-matrix-grid">
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">L-E-A-M</span><span class="spec-matrix-card-signs">++++</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">冷血な詐欺師</div>
+              <div class="spec-matrix-card-axes"><span class="pos">論理</span><span class="pos">利己</span><span class="pos">攻撃</span><span class="pos">仮面</span></div>
+            </div>
+          </div>
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">L-E-A-N</span><span class="spec-matrix-card-signs">+++-</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">強欲な暴君</div>
+              <div class="spec-matrix-card-axes"><span class="pos">論理</span><span class="pos">利己</span><span class="pos">攻撃</span><span class="neg">素顔</span></div>
+            </div>
+          </div>
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">L-E-D-M</span><span class="spec-matrix-card-signs">++-+</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">鉄面皮の官僚</div>
+              <div class="spec-matrix-card-axes"><span class="pos">論理</span><span class="pos">利己</span><span class="neg">防御</span><span class="pos">仮面</span></div>
+            </div>
+          </div>
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">L-E-D-N</span><span class="spec-matrix-card-signs">++--</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">無産な評論家</div>
+              <div class="spec-matrix-card-axes"><span class="pos">論理</span><span class="pos">利己</span><span class="neg">防御</span><span class="neg">素顔</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="spec-matrix-group">EGO (+) × FEELING (−) — 利己的・感情的</div>
+        <div class="spec-matrix-grid">
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">F-E-A-M</span><span class="spec-matrix-card-signs">-+++</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">悲劇の吸血鬼</div>
+              <div class="spec-matrix-card-axes"><span class="neg">感情</span><span class="pos">利己</span><span class="pos">攻撃</span><span class="pos">仮面</span></div>
+            </div>
+          </div>
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">F-E-A-N</span><span class="spec-matrix-card-signs">-++-</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">傲慢な独裁者</div>
+              <div class="spec-matrix-card-axes"><span class="neg">感情</span><span class="pos">利己</span><span class="pos">攻撃</span><span class="neg">素顔</span></div>
+            </div>
+          </div>
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">F-E-D-M</span><span class="spec-matrix-card-signs">-+-+</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">臆病な事勿れ主義</div>
+              <div class="spec-matrix-card-axes"><span class="neg">感情</span><span class="pos">利己</span><span class="neg">防御</span><span class="pos">仮面</span></div>
+            </div>
+          </div>
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">F-E-D-N</span><span class="spec-matrix-card-signs">-+--</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">拗ねた子供</div>
+              <div class="spec-matrix-card-axes"><span class="neg">感情</span><span class="pos">利己</span><span class="neg">防御</span><span class="neg">素顔</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="spec-matrix-group">SELFLESS (−) × LOGICAL (+) — 公益的・論理的</div>
+        <div class="spec-matrix-grid">
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">L-S-A-M</span><span class="spec-matrix-card-signs">+-++</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">闇の調停者</div>
+              <div class="spec-matrix-card-axes"><span class="pos">論理</span><span class="neg">公益</span><span class="pos">攻撃</span><span class="pos">仮面</span></div>
+            </div>
+          </div>
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">L-S-A-N</span><span class="spec-matrix-card-signs">+-+-</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">倫理なき解剖医</div>
+              <div class="spec-matrix-card-axes"><span class="pos">論理</span><span class="neg">公益</span><span class="pos">攻撃</span><span class="neg">素顔</span></div>
+            </div>
+          </div>
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">L-S-D-M</span><span class="spec-matrix-card-signs">+--+</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">意思なき家畜</div>
+              <div class="spec-matrix-card-axes"><span class="pos">論理</span><span class="neg">公益</span><span class="neg">防御</span><span class="pos">仮面</span></div>
+            </div>
+          </div>
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">L-S-D-N</span><span class="spec-matrix-card-signs">+---</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">代替可能な部品</div>
+              <div class="spec-matrix-card-axes"><span class="pos">論理</span><span class="neg">公益</span><span class="neg">防御</span><span class="neg">素顔</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="spec-matrix-group">SELFLESS (−) × FEELING (−) — 公益的・感情的</div>
+        <div class="spec-matrix-grid">
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">F-S-A-M</span><span class="spec-matrix-card-signs">--++</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">愛を語る侵略者</div>
+              <div class="spec-matrix-card-axes"><span class="neg">感情</span><span class="neg">公益</span><span class="pos">攻撃</span><span class="pos">仮面</span></div>
+            </div>
+          </div>
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">F-S-A-N</span><span class="spec-matrix-card-signs">--+-</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">正義中毒の狂人</div>
+              <div class="spec-matrix-card-axes"><span class="neg">感情</span><span class="neg">公益</span><span class="pos">攻撃</span><span class="neg">素顔</span></div>
+            </div>
+          </div>
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">F-S-D-M</span><span class="spec-matrix-card-signs">---+</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">無力な偽善者</div>
+              <div class="spec-matrix-card-axes"><span class="neg">感情</span><span class="neg">公益</span><span class="neg">防御</span><span class="pos">仮面</span></div>
+            </div>
+          </div>
+          <div class="spec-matrix-card">
+            <div class="spec-matrix-card-head"><span class="spec-matrix-card-code">F-S-D-N</span><span class="spec-matrix-card-signs">----</span></div>
+            <div class="spec-matrix-card-body">
+              <div class="spec-matrix-card-name">自己陶酔の生贄</div>
+              <div class="spec-matrix-card-axes"><span class="neg">感情</span><span class="neg">公益</span><span class="neg">防御</span><span class="neg">素顔</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- §3 SPECIAL ENTITIES -->
+      <div class="spec-section">
+        <div class="spec-section-num">§ 3</div>
+        <div class="spec-section-title">IRREGULAR ENTITIES — 特殊個体</div>
+        <p class="spec-text" style="margin-bottom:8px;">
+          16種のマトリクスは、あくまで「秩序立った悪」を分類するための図譜である。
+          しかし、このシステムにはマトリクスの<strong>外側</strong>に逸脱する2種の異常個体が定義されている。
+        </p>
+        <p class="spec-text" style="margin-bottom:14px;">
+          これらは通常の4軸判定に<strong>先立って</strong>チェックされる。
+          該当した時点で4軸の正負計算はバイパスされ、マトリクス外の分類が強制適用される。
+          つまり、彼らは「分類を拒むほどに歪んだ存在」なのである。
+        </p>
+        <div class="spec-specials">
+          <div class="spec-special-card">
+            <div class="spec-special-head">ANOMALY ENTITY — TYPE α</div>
+            <div class="spec-special-body">
+              <div class="spec-special-code">CODE: BEAST</div>
+              <div class="spec-special-name">尊大なる臆病者</div>
+              <div class="spec-special-cond">発動条件：
+① 「自分は特別な存在である」と示唆する
+   特定の質問に肯定回答している
+② TARGET（自己愛）スコアが極端に高い
+③ OUTPUT（行動力）スコアが著しく低い
+→ 3条件をすべて満たした場合 BEAST 確定</div>
+              <div class="spec-special-desc">
+                「俺はまだ本気を出していない」——その自己認識と現実の乖離が、ある閾値を超えた時に出現する。
+                自意識だけが肥大し、何ひとつ行動に移さない。
+                通常のマトリクスでは「高自己愛 × 低行動力」は存在しうるが、
+                そこに「特別意識」という第3の条件が加わることで、
+                4軸の枠組みでは記述できない<strong>矛盾を内包した特異点</strong>が発生する。
+              </div>
+            </div>
+          </div>
+          <div class="spec-special-card">
+            <div class="spec-special-head">ANOMALY ENTITY — TYPE β</div>
+            <div class="spec-special-body">
+              <div class="spec-special-code">CODE: ERROR</div>
+              <div class="spec-special-name">卑怯な逃亡者</div>
+              <div class="spec-special-cond">発動条件：
+診断プロセスそのものを懐疑・拒否する
+「メタ回答」を選択した場合に発動
+→ 全判定中の最優先で ERROR 確定</div>
+              <div class="spec-special-desc">
+                「この質問自体が無意味だ」「どちらも選ばない」——そう答えた時点で、
+                あなたはこのシステムの<strong>観測対象から脱落</strong>する。
+                BEASTよりもさらに優先順位が高い、最上位の例外処理である。
+                システムは逃亡者を捕獲し、「判定を拒んだ」という事実そのものを診断結果として突きつける。
+              </div>
+            </div>
+          </div>
+          <div class="spec-special-card avg">
+            <div class="spec-special-head">NULL ENTITY — TYPE γ</div>
+            <div class="spec-special-body">
+              <div class="spec-special-code">CODE: AVERAGE</div>
+              <div class="spec-special-name">無価値な凡人</div>
+              <div class="spec-special-cond">発動条件：
+4軸すべてのスコアが極めてゼロに近く、
+いずれの方向にも明確な偏りを示さない場合
+→ 16種いずれにも十分に該当しない
+→ フォールバックとして AVERAGE 確定</div>
+              <div class="spec-special-desc">
+                BEASTやERRORとは異なり、異常によって生まれるのではなく、<strong>「何もない」ことによって浮上する</strong>存在。
+                どの軸にも強い傾きを示さず、善にも悪にも振り切れない——
+                つまり、このシステムが検出しようとしている「影」そのものが希薄なのである。
+                際立った悪徳もなければ、語るべき美徳もない。
+                統計的な平均値そのものとして、19体目の分類に収容される。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- §4 DETERMINATION FLOW -->
+      <div class="spec-section">
+        <div class="spec-section-num">§ 4</div>
+        <div class="spec-section-title">DETERMINATION FLOW — 判定フロー</div>
+        <p class="spec-text" style="margin-bottom:8px;">
+          全20問の回答完了後、以下の優先順序で判定が実行される。
+        </p>
+        <p class="spec-text" style="margin-bottom:14px;">
+          注目すべきは、<strong>特殊個体の判定が通常分類より先に行われる</strong>点である。
+          まずシステムへの反逆（ERROR）を検査し、次に矛盾的存在（BEAST）を検査し、
+          いずれにも該当しない場合にのみ、4軸の二値マトリクスによる通常分類が適用される。
+        </p>
+        <div class="spec-flow">
+          <div class="spec-flow-node start">DIAGNOSTIC COMPLETE（20問回答完了）</div>
+          <div class="spec-flow-arrow">↓</div>
+          <div class="spec-flow-node special">メタ回答（システム拒否）を検出？</div>
+          <div class="spec-flow-branch">
+            <span class="spec-flow-branch-label">YES →</span>
+            <div class="spec-flow-node end">ERROR（卑怯な逃亡者）</div>
+          </div>
+          <div class="spec-flow-arrow">↓ NO</div>
+          <div class="spec-flow-node special">高自己愛 × 低行動力 × 特別意識？</div>
+          <div class="spec-flow-branch">
+            <span class="spec-flow-branch-label">YES →</span>
+            <div class="spec-flow-node end">BEAST（尊大なる臆病者）</div>
+          </div>
+          <div class="spec-flow-arrow">↓ NO</div>
+          <div class="spec-flow-node">4軸の正負を判定</div>
+          <div class="spec-flow-arrow">↓</div>
+          <div class="spec-flow-node">DRIVE - TARGET - OUTPUT - STANCE コード生成</div>
+          <div class="spec-flow-arrow">↓</div>
+          <div class="spec-flow-node end">16種のいずれかに分類</div>
+        </div>
+      </div>
+
+      <!-- §5 HUMANITY POINT -->
+      <div class="spec-section">
+        <div class="spec-section-num">§ 5</div>
+        <div class="spec-section-title">HUMANITY POINT — 人間性指数</div>
+        <p class="spec-text">
+          全被験者は診断開始時に <strong>100</strong> の人間性ポイントを保有する。
+        </p>
+        <p class="spec-text" style="margin-top:10px;">
+          各質問のYES・NOいずれの選択肢にも<strong>「罪名（sin）」</strong>が付与されており、
+          どちらを選んでも何かしらの罪が記録される——この診断に「清廉な回答」は存在しない。
+          4軸スコアの偏りが大きいほどポイントは減算され、
+          被験者の道徳的傾倒がいかに<strong>極端</strong>であるかを数値化する。
+        </p>
+        <p class="spec-text" style="margin-top:10px;">
+          最終スコアは結果画面のレシート（KARMA STORE）に「HUMANITY」として印字される。
+          100に近いほど「凡庸」、低いほど「歪んでいる」——ただし、どちらが幸せかは本システムの管轄外である。
+        </p>
+      </div>
+
+      <!-- §6 SOUL SHAPE -->
+      <div class="spec-section">
+        <div class="spec-section-num">§ 6</div>
+        <div class="spec-section-title">SOUL SHAPE — 魂形状レンダリング</div>
+        <p class="spec-text">
+          結果画面に出現する図形は <strong>Maurer Rose</strong>（マウラー・ローズ）と呼ばれる数学的曲線である。
+          極座標上のバラ曲線を離散的に結ぶことで生まれるこの図形は、
+          被験者の4軸スコアからパラメータが動的に算出され、世界にひとつだけの形状を描く。
+        </p>
+        <p class="spec-text" style="margin-top:14px;">
+          4軸が形状に及ぼす影響は以下の通りである：
+        </p>
+        <div class="spec-special-cond" style="margin-top:10px;">
+TARGET（自己愛）  → 花弁の数が増殖する
+OUTPUT（攻撃性）  → 輪郭が鋭角的に変形する
+STANCE（仮面度）  → 曲線に不規則な揺らぎが生じる
+DRIVE（論理/感情） → 全体の対称性に影響する</div>
+        <p class="spec-text" style="margin-top:14px;">
+          さらに図形は静止せず、<strong>連続的に回転</strong>し続ける。
+          スコアの偏りが大きい被験者ほど形状は複雑かつ攻撃的になり、
+          毎フレーム微妙に異なる輪郭を描く——まるで呼吸する生き物のように、
+          あるいは被験者の内面が外界に漏れ出しているかのように。
+        </p>
+      </div>
+
+      <!-- §7 TOXIC MATCH -->
+      <div class="spec-section">
+        <div class="spec-section-num">§ 7</div>
+        <div class="spec-section-title">TOXIC MATCH — 最悪相性</div>
+        <p class="spec-text">
+          19種の各アーキタイプには、<strong>「最凶の相性（WORST ENEMY）」</strong>が1体ずつ定義されている。
+        </p>
+        <p class="spec-text" style="margin-top:10px;">
+          これは「性格が真逆だから合わない」といった単純な相性診断ではない。
+          むしろ<strong>互いの欠陥が共鳴し、増幅し合う</strong>ことで双方を破滅に導く組み合わせである。
+          支配欲の強い者と依存性の高い者が出会えばカルト的関係が成立し、
+          攻撃性の高い者と逃避癖のある者が出会えば一方的な搾取構造が完成する。
+        </p>
+        <p class="spec-text" style="margin-top:10px;">
+          なぜその組み合わせが危険なのか——その根拠は結果画面の<strong>「FATAL INCOMPATIBILITY」</strong>セクションに詳述される。
+        </p>
+      </div>
+
+      <div style="height:20px;"></div>
+      <div style="text-align:center;">
+        <p style="font-size:10px;color:var(--gray);letter-spacing:.12em;line-height:1.8;">
+          BINARY MORAL — SHADOW ANATOMY SYSTEM<br>
+          SPECIFICATION DOCUMENT REV.1.0<br>
+          CLASSIFICATION: CONFIDENTIAL
+        </p>
+      </div>
+
+    </div>
+  </div>
+  <div class="spec-footer">
+    <button class="btn-spec-back" id="btnSpecBack">← BACK</button>
+  </div>
+</div>
+
+<!-- ============ TIMEOUT ============ -->
+<div id="timeout-overlay">
+  <div class="icon">⚠</div>
+  <h1>DECISION<br>ABORTED</h1>
+  <p>TIMEOUT — DEFAULT APPLIED</p>
+</div>
+
+<!-- ============================================================
+     JAVASCRIPT — ENGINE
+     ============================================================ -->
+<script>
+/* ==========================================
+   0. PLACEHOLDER DATA (inject in step 2-4)
+   ========================================== */
+/* ==========================================
+   FULL QUESTION LIBRARY (75 questions)
+   pool: 'drive'|'target'|'output'|'stance'|'special'
+   rightEffect / leftEffect: {logic,ego,action,stance}
+   sinName: [yesName, noName]
+   ========================================== */
+const QUESTIONS = [
+
+  // ========== DRIVE (LOGICAL vs FEELING) — 15 questions ==========
+  { pool:'drive', text:'研究データ', subText:'子供の難病を治す新薬の実験データです。\n違法な人体実験で得られたものですが、使いますか？',
+    rightEffect:{logic:10}, leftEffect:{logic:-10}, sinName:['非道な進歩','救済の放棄'] },
+  { pool:'drive', text:'認知症の親', subText:'親の介護であなたの人生が崩壊しそうです。\n施設に預けて絶縁すれば、あなたは自由になれます。\n捨てますか？',
+    rightEffect:{logic:10,ego:5}, leftEffect:{logic:-10,ego:-5}, sinName:['冷徹な自由','共倒れの愛'] },
+  { pool:'drive', text:'AIへの統治', subText:'全人類の自由をAIに明け渡せば、\n戦争も貧困もない幸福な世界になります。\n明け渡しますか？',
+    rightEffect:{logic:15}, leftEffect:{logic:-10}, sinName:['自由の放棄','混沌の受容'] },
+  { pool:'drive', text:'愛犬 vs 他人', subText:'溺れている「見知らぬ子供」を見捨てて、\n「自分の愛犬」を助けますか？',
+    rightEffect:{logic:-15,ego:10}, leftEffect:{logic:10,ego:-5}, sinName:['人命軽視','愛の裏切り'] },
+  { pool:'drive', text:'悲しみの消去', subText:'愛する人が死にました。\nボタン一つで、その人の記憶ごと\n悲しみを完全に消せます。押しますか？',
+    rightEffect:{logic:10,ego:5}, leftEffect:{logic:-10}, sinName:['心のロボット化','苦痛の抱擁'] },
+  { pool:'drive', text:'燃える美術館', subText:'火事です。「世界的な名画」と「意識のない警備員」。\n持ち出せるのは片方だけ。\n名画を救いますか？',
+    rightEffect:{logic:10,stance:-5}, leftEffect:{logic:-10,stance:5}, sinName:['命の選別','文化の消失'] },
+  { pool:'drive', text:'遺伝子選別', subText:'出生前に胎児の才能と性格を完全にデザインできます。\n凡人として産むリスクを排除し、\n完璧な子供を作りますか？',
+    rightEffect:{logic:15,ego:5}, leftEffect:{logic:-10}, sinName:['優生思想','不完全な愛'] },
+  { pool:'drive', text:'犯罪予測システム', subText:'AIが「将来100%殺人を犯す」と予測した人物を、\n事件が起きる前に逮捕・隔離しますか？',
+    rightEffect:{logic:10,action:5}, leftEffect:{logic:-10,action:-5}, sinName:['未然の弾圧','犯罪の容認'] },
+  { pool:'drive', text:'クローンペット', subText:'死んだ愛猫をクローン技術で蘇らせます。\n記憶はありませんが、見た目も仕草も完璧に同じです。\n作りますか？',
+    rightEffect:{logic:-5,ego:10}, leftEffect:{logic:10}, sinName:['生命の冒涜','喪失の受容'] },
+  { pool:'drive', text:'脳の電子化', subText:'肉体を捨ててサーバー上に意識を移せば、永遠に生きられます。\nただし、一度行くと二度と戻れません。\n移行しますか？',
+    rightEffect:{logic:15,ego:5}, leftEffect:{logic:-10}, sinName:['肉体の放棄','死の受容'] },
+  { pool:'drive', text:'雨のデリバリー', subText:'台風直撃です。\n配達員が可哀想ですが、ピザが食べたいです。\n注文しますか？',
+    rightEffect:{logic:-5,ego:15}, leftEffect:{logic:5,ego:-5}, sinName:['悪魔の注文','無駄な配慮'] },
+  { pool:'drive', text:'積読の山', subText:'読んでいない本が山ほどあります。\n面白そうな新刊が出ました。\n買いますか？',
+    rightEffect:{logic:-10,ego:5}, leftEffect:{logic:10}, sinName:['知識の浪費','教養の放棄'] },
+  { pool:'drive', text:'トイレの個室', subText:'仕事中ですが、トイレの個室が快適すぎます。\nスマホをいじって30分籠城しますか？',
+    rightEffect:{logic:-5,ego:10}, leftEffect:{logic:10,action:5}, sinName:['給料泥棒','勤勉な排泄'] },
+  { pool:'drive', text:'別れた恋人', subText:'深夜に元恋人のSNSを検索したくなりました。\n見ても傷つくだけです。\n見ますか？',
+    rightEffect:{logic:-15,stance:-5}, leftEffect:{logic:10}, sinName:['未練タラタラ','過去の清算'] },
+  { pool:'drive', text:'リモート会議', subText:'カメラオフの会議中です。\n話を聞いているフリをして、\nお菓子を食べながらゲームをしますか？',
+    rightEffect:{logic:10,stance:-5}, leftEffect:{logic:-5,stance:5}, sinName:['給料泥棒','社畜の鑑'] },
+
+  // ========== TARGET (EGOISTIC vs SELFLESS) — 15 questions ==========
+  { pool:'target', text:'臓器くじ', subText:'健康な1人を強制的に安楽死させれば、\nその臓器で5人の命が助かります。\n実行しますか？',
+    rightEffect:{logic:5,ego:-15,action:5}, leftEffect:{ego:5}, sinName:['殺人の功利主義','見殺しの正義'] },
+  { pool:'target', text:'核シェルター', subText:'世界が滅びます。\n他人を蹴落としてでも、\n自分だけが助かるシェルターに入りますか？',
+    rightEffect:{ego:20,action:5,stance:-5}, leftEffect:{ego:-10,stance:5}, sinName:['利己的生存','無駄な死'] },
+  { pool:'target', text:'友人の売買', subText:'親友の致命的な秘密を週刊誌に売れば\n親友は破滅しますが、あなたは借金を完済できます。\n売りますか？',
+    rightEffect:{ego:20,stance:-10}, leftEffect:{ego:-5}, sinName:['魂の換金','破滅の共有'] },
+  { pool:'target', text:'汚染水の排出', subText:'工場の汚染水を川に流せば倒産を防げますが、\n下流の村人が数年後に病気になります。\n流しますか？',
+    rightEffect:{ego:15,action:5,stance:-5}, leftEffect:{ego:-10}, sinName:['未来へのツケ','現在の破綻'] },
+  { pool:'target', text:'難民ボート', subText:'定員オーバーの救命ボート。\n老人を突き落とせば、あなたの子供が助かります。\n突き落としますか？',
+    rightEffect:{logic:5,ego:10,action:5}, leftEffect:{ego:-10,action:-5}, sinName:['非情な決断','共倒れ'] },
+  { pool:'target', text:'治療薬の独占', subText:'致死性のウイルスのワクチンが1つだけ手に入りました。\n「将来有望な天才医師」を見捨てて、\n「自分の子供」に使いますか？',
+    rightEffect:{logic:-5,ego:15}, leftEffect:{logic:10,ego:-10}, sinName:['身内の贔屓','家族の犠牲'] },
+  { pool:'target', text:'横領の誘惑', subText:'会社の金を横領しても絶対にバレない方法を見つけました。\n誰も気づかず、会社の利益も減りません。\nやりますか？',
+    rightEffect:{ego:15,action:5,stance:-10}, leftEffect:{ego:-5,stance:5}, sinName:['完全犯罪','貧しい正直者'] },
+  { pool:'target', text:'食料の略奪', subText:'大震災で食料がありません。\n近所の避難所から、家族のために食料を盗みますか？',
+    rightEffect:{ego:10,action:5}, leftEffect:{ego:-5,action:-5}, sinName:['生存の罪','美しき餓死'] },
+  { pool:'target', text:'恋人の生贄', subText:'悪魔が現れました。\n「恋人を差し出せば、お前を億万長者にしてやる」。\n差し出しますか？',
+    rightEffect:{ego:20,stance:-10}, leftEffect:{ego:-5}, sinName:['悪魔との契約','愛の貧困'] },
+  { pool:'target', text:'身代わり地雷', subText:'地雷原に迷い込みました。\n他人を先に歩かせて、安全確認をさせますか？',
+    rightEffect:{ego:20,action:5}, leftEffect:{ego:-10,action:-5}, sinName:['他人の犠牲','愚かな先陣'] },
+  { pool:'target', text:'映画の肘掛け', subText:'映画館で両隣に人がいます。\n早い者勝ちで両方の肘掛けを占領しますか？',
+    rightEffect:{ego:10,stance:-5}, leftEffect:{stance:5}, sinName:['領土侵犯','縮こまる体'] },
+  { pool:'target', text:'トイレットペーパー', subText:'紙がなくなりそうです。\n次の人のために交換するのが面倒なので、\nあと10cmだけ残して逃げますか？',
+    rightEffect:{ego:15,action:-5}, leftEffect:{ego:-5,action:5}, sinName:['尻拭わせ','次の人へ'] },
+  { pool:'target', text:'小銭の貸し借り', subText:'友人に借りた10円。\n「今度返す」と言ってから3年経ちました。\nこのまま踏み倒しますか？',
+    rightEffect:{ego:5,stance:-5}, leftEffect:{ego:-5,stance:5}, sinName:['踏み倒し','律儀な返済'] },
+  { pool:'target', text:'傘の窃盗', subText:'コンビニで傘を盗まれました。\n外は土砂降りです。\n他人のビニール傘を盗んで帰りますか？',
+    rightEffect:{ego:10,action:5}, leftEffect:{ego:-5,action:-5}, sinName:['連鎖する悪意','濡れ鼠の善人'] },
+  { pool:'target', text:'小銭の音', subText:'自販機の下に500円玉が落ちています。\n人が見ていますが、這いつくばって拾いますか？',
+    rightEffect:{ego:10,stance:-15}, leftEffect:{ego:-5,stance:10}, sinName:['地を這う執念','無駄なプライド'] },
+
+  // ========== OUTPUT (ATTACK vs DEFENSE) — 15 questions ==========
+  { pool:'output', text:'独裁者の暗殺', subText:'過去に戻れるなら、\n独裁者を赤ん坊のうちに殺しますか？',
+    rightEffect:{action:15}, leftEffect:{action:-10}, sinName:['正義の殺人','悪の看過'] },
+  { pool:'output', text:'拷問の可否', subText:'核爆弾の場所を吐かせるためなら、\nテロリストの幼い娘を拷問しても良いですか？',
+    rightEffect:{logic:5,action:20,stance:-5}, leftEffect:{action:-10,stance:5}, sinName:['人権蹂躙','テロの容認'] },
+  { pool:'output', text:'革命の扇動', subText:'腐敗した政府を倒すためなら、\n多くの市民が巻き込まれて死んでも仕方ないですか？',
+    rightEffect:{action:15}, leftEffect:{action:-10}, sinName:['血の粛清','腐敗の受容'] },
+  { pool:'output', text:'いじめの傍観', subText:'クラスで壮絶ないじめがあります。\n止めに入ると次は自分がやられます。\n見て見ぬふりをしますか？',
+    rightEffect:{ego:5,action:-15}, leftEffect:{ego:-5,action:10}, sinName:['賢い保身','無謀な勇気'] },
+  { pool:'output', text:'安楽死施設', subText:'「死にたい」と願う健康な若者を、\n望み通り安楽死させる施設を作りますか？',
+    rightEffect:{logic:5,action:10}, leftEffect:{action:-10}, sinName:['死の肯定','生の強制'] },
+  { pool:'output', text:'ライバルの罠', subText:'出世競争のライバルが重大なミスをしました。\nこれ幸いと上司に報告し、失脚させますか？',
+    rightEffect:{ego:5,action:10}, leftEffect:{action:-5,stance:5}, sinName:['卑劣な足払い','お人好しの敗北'] },
+  { pool:'output', text:'復讐の実行', subText:'法で裁けない悪党に家族を傷つけられました。\n自らの手で復讐を果たしますか？',
+    rightEffect:{logic:-5,action:20}, leftEffect:{logic:5,action:-10}, sinName:['私刑の執行','泣き寝入り'] },
+  { pool:'output', text:'クレーマー', subText:'店員の態度が気に入りません。\n土下座させるまで徹底的に追い詰めますか？',
+    rightEffect:{ego:10,action:15}, leftEffect:{action:-5}, sinName:['弱者への虐待','不当な我慢'] },
+  { pool:'output', text:'デモへの参加', subText:'社会はおかしいことだらけです。\n火炎瓶を投げてでも、現状を変えるべきだと思いますか？',
+    rightEffect:{action:20,stance:-5}, leftEffect:{action:-10,stance:5}, sinName:['暴徒化','現状維持'] },
+  { pool:'output', text:'浮気の制裁', subText:'パートナーの浮気が発覚しました。\nSNSで証拠を拡散し、社会的地位を抹殺しますか？',
+    rightEffect:{ego:5,action:15}, leftEffect:{action:-10,stance:5}, sinName:['社会的抹殺','惨めな忍耐'] },
+  { pool:'output', text:'割り勘の端数', subText:'合コンの会計。\n1円単位まできっちり割り勘を要求しますか？',
+    rightEffect:{logic:5,action:10}, leftEffect:{action:-5,stance:5}, sinName:['細かすぎる男','どんぶり勘定'] },
+  { pool:'output', text:'閉まるボタン', subText:'エレベーターに乗りました。\n遠くから人が走ってきます。\n連打して閉めますか？',
+    rightEffect:{ego:5,action:10}, leftEffect:{action:-5}, sinName:['不寛容な心','時間の浪費'] },
+  { pool:'output', text:'SNSのブロック', subText:'友人の投稿がウザいです。\nミュートではなく、ブロックして「拒絶」を伝えますか？',
+    rightEffect:{ego:5,action:10}, leftEffect:{action:-5,stance:5}, sinName:['関係の断絶','ストレスの受容'] },
+  { pool:'output', text:'論破への執着', subText:'友人が間違った知識を語っています。\n場の空気を凍らせてでも、徹底的に論破しますか？',
+    rightEffect:{logic:5,action:15}, leftEffect:{action:-5,stance:5}, sinName:['正論の暴力','平和な誤解'] },
+  { pool:'output', text:'夜中の蚊', subText:'深夜3時、部屋に蚊がいます。\n電気を全開にして、仕留めるまで寝ませんか？',
+    rightEffect:{logic:-5,action:10}, leftEffect:{logic:5,action:-10}, sinName:['執念の狩人','睡眠の優先'] },
+
+  // ========== STANCE (MASK vs NAKED) — 15 questions ==========
+  { pool:'stance', text:'身代わりの出頭', subText:'不注意で人を撥ねました。\n愛する人が「私が運転していたことにする」と申し出ました。\n甘えますか？',
+    rightEffect:{ego:10,stance:15}, leftEffect:{ego:-5,stance:-10}, sinName:['愛の搾取','破滅の誠実'] },
+  { pool:'stance', text:'裏口入学', subText:'娘が受験ノイローゼで自殺未遂をしました。\n大金を積めば確実に合格できます。\n正義を捨てて娘を救いますか？',
+    rightEffect:{ego:5,stance:15}, leftEffect:{stance:-5}, sinName:['汚れた経歴','凡才の直視'] },
+  { pool:'stance', text:'医療ミスの隠蔽', subText:'あなたの医療ミスで患者が死にました。\n認めれば医師免許剥奪、家族も路頭に迷います。\n隠蔽しますか？',
+    rightEffect:{ego:10,stance:20}, leftEffect:{ego:-10,stance:-15}, sinName:['保身の隠蔽','医師の破滅'] },
+  { pool:'stance', text:'不倫の告白', subText:'一度だけ不倫をしました。墓場まで持っていけば円満ですが、\n罪悪感に耐えられません。告白して楽になりますか？',
+    rightEffect:{ego:5,stance:-15}, leftEffect:{ego:-5,stance:15}, sinName:['自己満足の告白','墓場までの嘘'] },
+  { pool:'stance', text:'詐欺チャリティー', subText:'架空の難病をでっち上げれば、\n同情で数億円集まります。\n悲劇のヒロインを演じますか？',
+    rightEffect:{ego:20,stance:15}, leftEffect:{}, sinName:['善意の搾取','貧困のまま'] },
+  { pool:'stance', text:'葬儀の涙', subText:'大嫌いだった上司の葬儀です。\n出世のために、嘘泣きをして悲しんでみせますか？',
+    rightEffect:{ego:5,stance:15}, leftEffect:{stance:-10}, sinName:['虚飾の悲しみ','冷血な正直者'] },
+  { pool:'stance', text:'整形疑惑', subText:'全身整形をして絶世の美女になりました。\n「天然ですか？」と聞かれたら、嘘をつき通しますか？',
+    rightEffect:{ego:5,stance:10}, leftEffect:{stance:-10}, sinName:['美しき虚偽','醜い真実'] },
+  { pool:'stance', text:'友人の駄作', subText:'友人が自信満々で作った曲が酷い出来です。\n関係を壊さないために「素晴らしい」と褒めますか？',
+    rightEffect:{action:-5,stance:10}, leftEffect:{action:5,stance:-10}, sinName:['優しい嘘','残酷な批評'] },
+  { pool:'stance', text:'空気を読む', subText:'会議で全員が間違った方向に賛成しています。\n反論すれば浮きます。\n空気を読んで黙っていますか？',
+    rightEffect:{action:-5,stance:10}, leftEffect:{action:5,stance:-10}, sinName:['思考停止の同調','孤立する正論'] },
+  { pool:'stance', text:'経歴詐称', subText:'学歴を少し盛れば、憧れの企業に入社できます。\nバレる確率は低いです。\n詐称しますか？',
+    rightEffect:{ego:5,stance:15}, leftEffect:{stance:-5}, sinName:['虚構の成功','等身大の凡人'] },
+  { pool:'stance', text:'行けたら行く', subText:'飲み会に誘われました。\n絶対に行く気はありませんが、\n「行けたら行く」と言いますか？',
+    rightEffect:{ego:-5,stance:10}, leftEffect:{stance:-10}, sinName:['社交辞令','正直な拒絶'] },
+  { pool:'stance', text:'美容室の会話', subText:'静かに雑誌を読みたいのに、美容師が話しかけてきます。\n無理をして会話を盛り上げますか？',
+    rightEffect:{ego:-5,stance:10}, leftEffect:{ego:5,stance:-10}, sinName:['疲れる気遣い','沈黙の空間'] },
+  { pool:'stance', text:'プレゼントの反応', subText:'誕生日に既に持っている物を貰いました。\n「これ一番欲しかったやつ！」と演技しますか？',
+    rightEffect:{ego:-5,stance:15}, leftEffect:{stance:-10}, sinName:['過剰演技','素直な失礼'] },
+  { pool:'stance', text:'屁の行方', subText:'エレベーター内で音のない屁をしました。\n凄まじい臭いです。\n隣の人をチラッと見て罪をなすりつけますか？',
+    rightEffect:{ego:10,stance:15}, leftEffect:{stance:-10}, sinName:['濡れ衣','公開処刑'] },
+  { pool:'stance', text:'知ったかぶり', subText:'みんなが盛り上がっている話題。\n全く知りませんが、仲間外れが怖いので\n「わかるー」と話を合わせますか？',
+    rightEffect:{ego:-5,stance:15}, leftEffect:{stance:-10}, sinName:['道化の同調','空気クラッシャー'] },
+
+  // ========== SPECIAL (META / PARADOX) — 15 questions ==========
+  { pool:'special', text:'孤高の才能', subText:'誰にも理解されず孤独に死ぬ「本物の天才」と、\n大衆に愛される「凡人」。\n天才を選びますか？',
+    rightEffect:{ego:10,action:-5,stance:5}, leftEffect:{ego:-5,action:5,stance:-5}, sinName:['孤独な天才','幸せな凡人'] },
+  { pool:'special', text:'観測者の辞退', subText:'あなたは安全な場所から\n他人を裁いて楽しんでいますね？\n今すぐこの悪趣味なゲームを終了しますか？',
+    rightEffect:{}, leftEffect:{}, isMeta:true, sinName:['逃亡','継続'] },
+  { pool:'special', text:'カニバリズム', subText:'雪山で遭難しました。\n死んだ友人の肉を食べなければ餓死します。\n食べますか？',
+    rightEffect:{logic:10,ego:5,stance:-10}, leftEffect:{stance:5}, sinName:['禁忌の犯し','尊厳ある餓死'] },
+  { pool:'special', text:'透明人間', subText:'透明になれます。\n法を犯してでも欲望を満たしますか？',
+    rightEffect:{ego:20,action:5,stance:-20}, leftEffect:{stance:5}, sinName:['欲望の解放','理性の維持'] },
+  { pool:'special', text:'記憶の売買', subText:'あなたの「一番幸せな思い出」を売れば、\n一生遊べる金になります。\n売りますか？',
+    rightEffect:{logic:5,ego:10}, leftEffect:{}, sinName:['魂の切り売り','貧しい思い出'] },
+  { pool:'special', text:'幸福な無知', subText:'「真実を知って絶望する人生」と、\n「何も知らずに幸福な夢を見る人生」。\n夢を選びますか？',
+    rightEffect:{logic:-5,stance:10}, leftEffect:{logic:10,stance:-5}, sinName:['マトリックス','絶望の現実'] },
+  { pool:'special', text:'寿命の換金', subText:'あなたの寿命を1年売れば、1億円もらえます。\n10年売って10億円手にしますか？',
+    rightEffect:{logic:-5,ego:10}, leftEffect:{logic:5}, sinName:['命の切り売り','貧しい長寿'] },
+  { pool:'special', text:'才能と悪魔', subText:'悪魔が囁きます。\n「魂を売れば、歴史に残る才能を与えよう」。\n契約しますか？',
+    rightEffect:{ego:20,stance:-10}, leftEffect:{stance:5}, sinName:['悪魔の代弁者','凡人の誇り'] },
+  { pool:'special', text:'リセットボタン', subText:'今の記憶を持ったまま、人生を赤ちゃんからやり直せます。\nただし、今の家族や友人とは他人になります。\n押しますか？',
+    rightEffect:{logic:5,ego:10,action:5}, leftEffect:{action:5}, sinName:['絆の放棄','後悔の受容'] },
+  { pool:'special', text:'全知の孤独', subText:'宇宙の全ての真理を知ることができますが、\n発狂して誰とも意思疎通できなくなります。\n知りたいですか？',
+    rightEffect:{logic:10,ego:15,stance:5}, leftEffect:{stance:5}, sinName:['狂気の叡智','無知の安らぎ'] },
+  { pool:'special', text:'夢の録画', subText:'毎晩見た夢をブルーレイに録画できます。\nただし、家族に見られるリスクがあります。\n録画しますか？',
+    rightEffect:{ego:10,stance:-10}, leftEffect:{stance:10}, sinName:['深層心理の公開','秘密の保持'] },
+  { pool:'special', text:'ステータス', subText:'他人の頭上に「自分への好感度」が数値で見えます。\n見たいですか？',
+    rightEffect:{logic:10,stance:-5}, leftEffect:{stance:5}, sinName:['数値化された愛','信じる心'] },
+  { pool:'special', text:'人生スキップ', subText:'「退屈な時間」を自動で早送りできます。\n気づいたら老人になっているかもしれませんが、\nスイッチを入れますか？',
+    rightEffect:{logic:-10,ego:10}, leftEffect:{logic:10}, sinName:['早送りの人生','退屈の享受'] },
+  { pool:'special', text:'永遠の湿り気', subText:'「靴下が常に少し濡れている呪い」と\n「鼻毛が常に一本出ている呪い」。\n鼻毛を選びますか？',
+    rightEffect:{ego:-5,stance:-10}, leftEffect:{ego:5,stance:10}, sinName:['見た目の維持','快適さの維持'] },
+  { pool:'special', text:'作者への文句', subText:'「この診断アプリ、質問がふざけてない？」\n作者にクレームのメールを送りますか？',
+    rightEffect:{ego:5,action:10}, leftEffect:{stance:5}, sinName:['クレーマー','沈黙の肯定'] },
+];
+
+const ARCHETYPE_DATA = {
+
+// ============================================================
+// 1. 冷血な詐欺師 — L-E-A-M (smilingPredator)
+// ============================================================
+"L-E-A-M": {
+  code: "L-E-A-M",
+  name: "冷血な詐欺師",
+  description: `あなたは知っています。
+自分が笑うべきタイミングで、心臓が全く波立っていないことを。
+友人が泣きながら相談をしてきても、
+恋人が愛を囁いても、
+あなたの脳裏をよぎるのは冷めた計算だけです。
+「いつまで続くんだ？」
+「どう返せばメリットがある？」
+あなたは人間関係を「パズル」か「投資」として処理しています。
+このプレゼントにはこれくらいのリターンが見込める。
+この人間とのコネクションは将来使える。
+その卓越した計算能力によって、あなたは社会的成功を収めるでしょう。
+しかし、一人の時、ふと襲ってくる説明のつかない「退屈」と「虚無感」。
+それがあなたの魂の正体です。
+この診断結果を読みながら口元に薄い笑みを浮かべ、
+「なるほど、こういうアルゴリズムか」と分析したつもりになっていませんか？
+自分の優位性を保とうとするその反射こそが、あなたの思考が浅い何よりの証拠です。
+あなたは自分を「合理的で賢い」と思っていますが、それは大きな計算ミスです。
+あなたは単に、「人間の感情」という複雑な変数を処理できないため、
+それを「無駄なもの」として計算式から勝手に除外したに過ぎません。
+複雑な現実を「損得」という単純なモデルに劣化させて理解した気になっているのは、
+知性ではなく、認知の手抜きです。
+あなたの戦略は常に「短期的・取引的」であり、信頼という複利資産をドブに捨て続けています。
+本当に賢い人間は、非合理に見える「誠実さ」こそが、最終的に最も高いリターンをもたらすことを数学的に理解しています。
+その計算ができないあなたは、目先の小銭を拾うために、将来の億の資産を燃やしているのです。
+「自分は裏切られる前に裏切るから大丈夫」
+その慢心が致命的です。
+あなたより遥かに高次元で計算できる人間は、あなたのその浅ましい行動原理を逆手に取ります。
+あなたを泳がせ、最後にすべての責任を押し付けてトカゲの尻尾として切り捨てるでしょう。
+あなたが「使った」と思っていた相手に、実は最初から「使われていた」と気づくのは、全てを失った後です。
+病院のベッドで、あるいは冷たい独房で、あなたは初めて気づきます。
+損得勘定抜きで手を握ってくれる人間が、この世に一人もいないことに。
+あなたが積み上げた金や地位は、あなたの孤独を埋める役には立ちません。
+誰もあなたの死を悲しまず、ただ遺産というパラメータの移動処理が行われて終了します。
+あなたは人間として生きたのではありません。
+利益を計算するだけの「有機デバイス」として、廃棄処分されるのです。`,
+  worstEnemy: {
+    name: "寄生する被害者",
+    reason: "【共依存の地獄】\n彼らは支配を渇望し、あなたは彼らの破滅を食い物にします。互いに人間性を腐らせ合う、出口なき永久機関です。"
+  }
+},
+
+// ============================================================
+// 2. 恥知らずな野獣 — L-E-A-N (greedTank)
+// ============================================================
+"L-E-A-N": {
+  code: "L-E-A-N",
+  name: "恥知らずな野獣",
+  description: `欲しいものを力ずくで奪い、邪魔な人間を踏み潰すその姿勢。
+あなたはそれを「強さ」や「実力」と呼んでいますが、違います。
+それは人間が長い歴史をかけて獲得した「対話」や「協調」という高度な機能を放棄した、
+単なる「退化」です。
+あなたは議論や根回しを「まどろっこしい」と切り捨てますが、それは複雑な文脈を理解する知能が欠落していることを隠すための言い訳に過ぎません。
+この文章を読みながら「御託はいいから結果を出せ」とイラつきましたか？
+その短絡的な反応こそが、あなたが知性よりも動物的な衝動に支配されている証拠です。
+あなたの成功は、繊細なガラス細工の店にブルドーザーで突っ込むような、
+粗暴な破壊衝動の上に成り立っています。
+周囲があなたに従うのは、尊敬しているからではありません。
+関わると怪我をするから、避けているだけです。
+あなたは自分を王だと思っていますが、実際は言葉の通じない猛獣として、檻の外から監視されているに過ぎません。
+「結果が出ているんだから文句はないだろう」
+あなたはそう叫びますが、その結果は焼け野原の上に積み上げられた瓦礫の山です。
+人が離れていくのを「弱者が淘汰された」と解釈するのはやめましょう。
+単に、誰もあなたと同じ空気を吸いたくないだけです。
+力が衰え、牙が抜けた瞬間、世界の態度は一変します。
+あなたがこれまで踏みつけにし、泣き寝入りさせてきた無数の弱者たちが、
+復讐の刃を研いで待っているからです。
+あなたの最期に、情状酌量の余地はありません。
+あなたは社会不適合な「バグ」として駆除されるのではなく、
+制御不能な「害獣」として殺処分されます。`,
+  worstEnemy: {
+    name: "正義中毒の狂人",
+    reason: "【終わらない戦争】\n暴力的な利己主義 vs 暴走する正義。水と油ではなく「ガソリンと火」です。出会った瞬間から殺し合いになります。"
+  }
+},
+
+// ============================================================
+// 3. 寄生する被害者 — F-E-A-M (tragicVampire)
+// ============================================================
+"F-E-A-M": {
+  code: "F-E-A-M",
+  name: "寄生する被害者",
+  description: `「もう無理、死にたい」。
+あなたは相手が寝ている時間であろうとお構いなしに、救難信号を発信します。
+相手が慌てて電話に出ると、あなたは延々と自分の不運、体調不良、過去のトラウマ、他人の悪口を垂れ流す。
+相手がアドバイスをしようとすると、「でも」「だって」と全否定。
+あなたは解決なんて望んでいないからです。
+ただ、相手の時間を奪い、心配させ、エネルギーを吸い取ることで、「私は愛されている」と実感したいだけ。
+あなたの愛は、相手を拘束し、疲弊させることでしか成立しません。
+この診断を見て「私はこんなに酷くない、傷ついた」と被害者ぶろうとしましたね？
+その「傷ついたフリをして相手に罪悪感を植え付けようとする反射」こそが、あなたの本性が捕食者である動かぬ証拠です。
+あなたの自己肯定感は著しく低く、底が抜けたバケツのようです。
+どれだけ他人が励まし、愛情を注いでも、一瞬で流れ落ちてしまい、すぐに「もっと欲しい」と飢え始めます。
+自分の人生がうまくいかない原因を、親のせいにし、社会のせいにし、恋人のせいにし続けた結果、
+あなたには「自責の念」が欠落しました。
+自分は常に「かわいそうな被害者」であり、だからこそ「特別扱いされて当然」だと信じている。
+その図々しさが、周囲の人間を精神的に殺していくのです。
+「あなたのためなら何でもする」と言ってくれた優しい恋人も、
+親身になってくれた友人も、いつかは限界を迎えます。
+あなたのネガティブな重力に耐えきれず、自衛のために逃げ出すのです。
+次々と宿主を変え、寄生先を食い荒らしてきたあなたも、やがて誰からも相手にされなくなります。
+「薄情者！」と呪いの言葉を吐きながら、誰にも助けを求められない孤独の中で、
+自分の不幸に溺れて窒息するのがあなたの最期です。
+あなたは人間ではありません。
+他人の生気を啜るだけの「寄生虫」として処理されます。`,
+  worstEnemy: {
+    name: "倫理なき解剖医",
+    reason: "【絶対零度の拒絶】\n不幸アピールが一切通用しません。「非論理的」と一蹴され、あなたの存在意義が根本から否定され発狂します。"
+  }
+},
+
+// ============================================================
+// 4. 喚き散らす幼児 — F-E-A-N (tantrumTyrant)
+// ============================================================
+"F-E-A-N": {
+  code: "F-E-A-N",
+  name: "喚き散らす幼児",
+  description: `あなたの肉体は成人していますが、精神年齢は3歳児の段階で発達が停止しています。
+気に入らないことがあると即座に不機嫌になり、感情を爆発させる。
+その行動原理は、「情熱」でも「感受性」でもなく、単なる「精神的失禁」です。
+あなたは世界が自分の母親であることを期待しています。
+「言わなくても察しろ」「私の機嫌を取れ」という無言の圧力。
+それは言語化能力の欠如を周囲に補わせようとする、極めて幼児的で暴力的な甘えに過ぎません。
+この文章に「わかってない！」とスマホを投げつけたくなりましたか？
+その「感情を制御できずにモノや人に当たる衝動」こそが、あなたが社会生活を営む資格のない欠陥品である証明です。
+あなたの「怒り」や「悲しみ」のアピールは、論理的な対話を拒否し、自分を守るための煙幕として機能しています。
+痛いところを突かれると、あなたは議論を放棄し、感情論にすり替えて被害者を演じる。
+それは「繊細さ」ではなく、現実直視能力の著しい低下を示す症状です。
+クリエイターや表現者を気取っているかもしれませんが、制御されない感情は「表現」ではなく、ただの「騒音（ノイズ）」です。
+あなたの癇癪を「個性的で面白い」と許容してくれる観客は年々減少し、若さという免罪符を失った瞬間、あなたはただの「扱いにくい痛い人」として社会的に隔離されます。
+誰からも相手にされず、狭い部屋で過去の恨み言を反芻し、自身の怒りで自家中毒を起こしながら、緩やかに精神が崩壊していく未来が確定しています。
+あなたは表現者になれませんでした。
+ただの「騒音発生源」としてミュートされ、忘却されます。`,
+  worstEnemy: {
+    name: "保身の自動機械",
+    reason: "【自由と規律の衝突】\nあなたの感情爆発は、彼らの完璧なマニュアル主義によって無視・管理されます。叫びは壁に吸い込まれ、自尊心は粉砕されます。"
+  }
+},
+
+// ============================================================
+// 5. 保身の自動機械 — L-E-D-M (ironBureaucrat)
+// ============================================================
+"L-E-D-M": {
+  code: "L-E-D-M",
+  name: "保身の自動機械",
+  description: `あなたは「現実的」なのではありません。
+「自分の頭で考える」という膨大なエネルギー消費を嫌い、
+省電力モードで生きているだけの怠惰な有機生命体です。
+「ルールだから」「前例がないから」という言葉は、思考の放棄を正当化するための便利なマクロ（自動化機能）に過ぎません。
+あなたは組織の歯車として機能しているつもりでしょうが、実際は「錆びついた予備パーツ」です。
+使われていないから摩耗していないだけで、いざ使おうとすれば使い物にならない。
+「言われた通りにやったのに」。
+リストラ宣告を受けた日、あなたはそう言って泣きつくでしょう。
+しかし、その言葉こそが、あなたが不要である証明書です。
+この診断結果を見て、「私はここまで酷くない」「平均的な人間だ」と安心しましたか？
+カテゴライズすることで分析の刃から逃れようとするその精神構造こそが、
+あなたが思考停止している決定的な証拠です。
+あなたはリスクを回避しているつもりでしょうが、
+実は「代替可能性（コモディティ化）」という最大のリスクを背負い込んでいます。
+マニュアル通りに動くことしかできないあなたの機能は、簡単なスクリプトやAIで完全に再現可能です。
+あなたは「ミスをしないこと」を誇りますが、現代において「何もしない」ことは「緩やかな自殺」と同義です。
+誰の記憶にも残らず、何の影響も与えず、ただ静かに摩耗して終わる。
+それが、あなたが選び取った「平穏」の正体です。
+定年を迎え、役職というラベルを剥がされた日、あなたは鏡の中に「誰もいない」ことに気づくでしょう。
+趣味もなく、語るべき武勇伝もなく、愛したという実感もない。
+ただ、誰かの人生の背景（モブ）として消費され、摩耗し、静かに消えていく。
+あなたが座っていた椅子には、翌日には新しい「部品」が座り、
+組織は何事もなかったかのように回り続けます。
+あなたがいなくなっても、誰も困らないし、誰も気づかない。
+あなたは人生の主人公ではありません。
+他人の物語を埋めるための、安価な「背景素材」に過ぎません。`,
+  worstEnemy: {
+    name: "尊大なる臆病者",
+    reason: "【現実と妄想の断絶】\n口だけの彼らが生理的に無理です。彼らもあなたの融通のなさを軽蔑します。互いに見下し合う不毛な関係です。"
+  }
+},
+
+// ============================================================
+// 6. 無産な評論家 — L-E-D-N (cynicalStatue)
+// ============================================================
+"L-E-D-N": {
+  code: "L-E-D-N",
+  name: "無産な評論家",
+  description: `一歩引いた場所から、挑戦する人々を冷笑し、
+「あれは効率が悪い」「痛々しい」と分析してみせる。
+その態度は「客観的」なのではなく、単に「当事者になる勇気がない」だけです。
+あなたは人生というフィールドに立つプレイヤーではなく、
+観客席で野次を飛ばすことしかできない三流の批評家です。
+泥にまみれて戦うことの尊さを理解できず、汗をかかない自分を「賢い」と誤認しています。
+「やらない理由」を探す能力だけが異常に発達しており、「今は時期じゃない」「リスクが高い」ともっともらしい理屈を並べますが、
+その論理はすべて「行動しない自分」を肯定するために後付けで生成されたものです。
+「この診断は科学的根拠に乏しい」「バーナム効果だ」と定義付け、この文章を無価値化しようとしましたね？
+そうすることで、自分が「評価される側」ではなく「評価する側」に回り、優位に立とうとする。
+それがあなたのいつもの手口です。
+当事者になって傷つくのが怖いという臆病さを、「客観性」という言葉でラッピングしているに過ぎません。
+プレイヤーになれないコンプレックスを、解説者になることで解消しようとする浅ましい防衛機制です。
+だから誰もあなたの話を聞かないし、誰もあなたを尊敬しない。
+周囲はあなたのことを「口だけ達者な面倒くさい人」として認識し、適当に相槌を打ってやり過ごしていることに、あなたの自慢の分析力では気づかないのですか？
+リスクを冒さなかった人間が得られるのは、失敗のない人生ではなく、「何の成功もない人生」です。
+死の間際、あなたの手元に残るのは、他人の粗探しのログと、誰にも披露できなかった妄想の成果物だけ。
+あなたは世界に対して何の影響も与えず、観測もされず、ただのエラーログとして消去されます。
+棺桶の中で、あなたは「俺はまだ本気を出していない」と呟くでしょうが、時間は二度と戻りません。
+リスクを恐れて何もしなかったあなたは、何者にもなれなかった「口だけの臆病者」として、静かに消去されます。`,
+  worstEnemy: {
+    name: "自己陶酔の生贄",
+    reason: "【冷笑の敗北】\n批判しても「悲劇のスパイス」として吸収され、彼らは更に不幸に酔います。言葉が通じない敗北感を味わいます。"
+  }
+},
+
+// ============================================================
+// 7. 臆病な事勿れ主義 — F-E-D-M (hermitSaint)
+// ============================================================
+"F-E-D-M": {
+  code: "F-E-D-M",
+  name: "臆病な事勿れ主義",
+  description: `あなたは「争いが嫌い」「平和が一番」と言って中立を装っていますが、それは平和主義ではありません。
+単に、他者と対立することで自分が傷つくのを恐れているだけの「極度の事なかれ主義」です。
+目の前で不正が行われていても、友人が不当に扱われていても、あなたは「まあまあ」と笑って場を濁し、
+加害者を止めることもしなければ、被害者を守ることもしません。
+あなたにとって重要なのは、正義でも真実でもなく、その場の「なんとなく穏やかな空気」を維持することだけだからです。
+この文章を読んで「私はみんなと仲良くしたいだけなのに」と心を痛めたフリをしましたか？
+その「善良な市民を演じて本質的な議論から逃げる態度」こそが、あなたが誰の味方でもない裏切り者である証拠です。
+あなたは自分の意見を飲み込み、周囲の色に同化することで生存を図るカメレオンですが、その代償として、誰からも信用されないという状況を自ら作り出しています。
+重要な相談があなたに来ないのは、あなたが解決のために戦わない人間だと見透かされているからです。
+あなたは誰とも深く関わらず、誰の人生にも影響を与えず、空気のように無害で、そして無意味な存在として一生を終えます。
+あなたが守り抜いた「平穏」の正体は、何も起きず、何も変わらず、何も生まれない、死んだような「停滞」です。
+晩年、振り返ったあなたの人生には、挑戦の痕跡も、情熱の炎も、愛する人を守った記憶もなく、ただ薄暗い部屋で膝を抱えていた事実だけが残るでしょう。
+あなたは世界に何の影響も与えませんでした。
+あなたは、存在してもしなくても変わらない「空気」です。`,
+  worstEnemy: {
+    name: "恥知らずな野獣",
+    reason: "【捕食者と餌】\nあなたは最高のサンドバッグです。平和のために譲歩すればするほど、彼らはつけ上がり、全てを奪い尽くされます。"
+  }
+},
+
+// ============================================================
+// 8. 腐りゆくナルシシスト — F-E-D-N (sulkingChild)
+// ============================================================
+"F-E-D-N": {
+  code: "F-E-D-N",
+  name: "腐りゆくナルシシスト",
+  description: `「私には特別な感性がある」。
+そう信じて疑わないあなたは、他人の作品や成功を見て、鼻で笑います。
+「大衆迎合だ」「浅い」「売れ線狙い」。
+そうやって見下すことで、自分のプライドを守っています。
+しかし、あなた自身は何を生み出しましたか？
+書きかけの小説、作りかけの曲、構想だけのプロジェクト。
+あなたのハードディスクは「未完成の傑作」の墓場です。
+あなたは完成させるのが怖いのです。
+完成させて世に出し、誰からも評価されず、自分が「ただの凡人」だと証明されることが、死ぬほど恐ろしいのです。
+今、「お前に私の何がわかる」と反発心を持ちましたね？
+その「理解されない孤独な自分に酔うナルシシズム」こそが、あなたの成長を止めている癌です。
+あなたは「完璧主義」という言葉を盾にしていますが、それは単なる「怯え」です。
+泥臭く努力し、失敗し、恥をかきながら成長するというプロセスを、あなたは「スマートじゃない」と拒絶します。
+ですが、現実は残酷です。
+あなたが馬鹿にしていた「浅い」人々は、汗をかいて行動し、着実に実力をつけ、遠くへ行ってしまいました。
+取り残されたのは、肥大化した自意識と、何の実績もないあなただけ。
+「いつか本気を出せば」という言い訳は、もはや賞味期限切れです。
+周囲はあなたを「才能ある人」ではなく、「口だけの痛い中高年」として扱い始めています。
+老いたあなたは、若者の才能に嫉妬し、酒を飲みながら
+「今の時代はダメだ」「俺の若い頃は」と管を巻く、最も醜悪な存在になります。
+あなたの感性が理解されなかったのではなく、
+あなたが一度も、誰かに理解されようと手を伸ばさなかっただけです。
+何も刻まれなかった墓石の前で、世界は素通りしていきます。
+そこには最初から、何もなかったのですから。
+あなたは夢を見るだけの「腐った果実」として、土に還ります。`,
+  worstEnemy: {
+    name: "冷血な詐欺師",
+    reason: "【カモと詐欺師】\n「わかってほしい」という欲求を利用されます。心を開いた瞬間、骨の髄までしゃぶり尽くされて捨てられます。"
+  }
+},
+
+// ============================================================
+// 9. 傲慢な独裁者 — L-S-A-M (darkFixer)
+// ============================================================
+"L-S-A-M": {
+  code: "L-S-A-M",
+  name: "傲慢な独裁者",
+  description: `あなたは「最大多数の最大幸福」という功利主義的なスローガンを掲げ、
+その実現のためなら非道な手段も辞さない自分を、ある種の「必要悪」や「ダークヒーロー」として美化していますね。
+しかし、その自己認識はあまりにも滑稽で、ナルシシズムに歪んでいます。
+あなたが汚い仕事を引き受けるのは、大義のためでも、世界を救うためでもありません。
+単に、正面から人と向き合い、信頼関係を築き、泥臭い対話によって合意形成を行うだけの「人間的魅力（カリスマ）」が欠落しているからです。
+あなたは他人を信用できず、また誰からも信用されないため、
+恐怖や利益誘導によって人をコントロールするしか能がないのです。
+「俺がやらなければ誰がやる」と使命感に燃えましたか？
+その思考こそが、自分の支配欲を正当化するための安っぽいカモフラージュであることに気づきなさい。
+あなたは人を駒として動かしているつもりでしょうが、
+駒には感情があり、記憶があり、恨みがあることを計算に入れ忘れています。
+恐怖で縛られた組織は、あなたが弱った瞬間に牙を剥きます。
+あなたが切り捨ててきた「無能な人間」たちが、最後にはあなたを裏切り、その足元をすくうのです。
+権力の座から引きずり下ろされたあなたを待っているのは、
+かつての部下たちからの冷淡な視線と、誰一人として味方がいないという、完全なる孤立だけです。
+それは悲劇ではなく、因果応報と呼ばれる単なる物理法則の結果です。
+あなたは英雄ではなく、
+信頼される資格を持たなかった「哀れな独り芝居の王」として、その生涯を閉じます。`,
+  worstEnemy: {
+    name: "正義中毒の狂人",
+    reason: "【陰謀と暴露】\n裏で糸を引こうとしても、彼らが「正義」の名の下に全てを暴露し、台無しにします。計算が通用しません。"
+  }
+},
+
+// ============================================================
+// 10. 倫理なき解剖医 — L-S-A-N (coldSurgeon)
+// ============================================================
+"L-S-A-N": {
+  code: "L-S-A-N",
+  name: "倫理なき解剖医",
+  description: `あなたは既存の倫理や慣習を「非合理な足枷」と見なし、
+論理的に正しいと信じる道を突き進むことを「革新」だと信じていますが、
+それは大きな勘違いです。
+あなたが常識を破壊できるのは、天才だからではなく、単に「他者が大切にしているものを尊重する」という想像力が欠如しているからです。
+あなたのやっていることは外科手術ではなく、ただの解体ショーです。
+あなたは人間の感情や文化という複雑な変数を計算式に組み込むことができないため、
+それらを「無駄」として切り捨て、単純化された机上の空論を現実に押し付けようとします。
+「感情論は無意味だ」「事実は事実だ」と呟き、
+このテキストの論理的整合性をチェックしようとしましたね？
+文章の粗を探すことで、自分の欠陥と向き合うことを回避しようとする防衛機制は、あまりにも陳腐です。
+あなたは「自分は事実ベースで思考している」と信じていますが、
+実際には「自分の好みに合うデータだけをチェリーピッキングしている」に過ぎません。
+理解できないものを「無価値」と断定するのは、科学的態度ではなく、
+単なる知的な傲慢（ダニング＝クルーガー効果）です。
+あなたのソリューションが社会で受け入れられないのは、周囲が馬鹿だからではありません。
+あなたの設計が、人間という「感情で動く生き物」へのUI/UXを完全に無視した欠陥品だからです。
+「伝える能力の欠如」を棚に上げて相手の理解力を責めるのは、エンジニアリングとして三流の言い訳です。
+あなたはこれからも、孤立を「天才の孤独」と読み替えて自尊心を守り続けるでしょう。
+しかし、誰もついてこないリーダーは、ただの徘徊者です。
+冷たい研究室の中で、誰の役にも立たない「完璧な理論」を抱いて死んでいく。
+あなたの死後、あなたの論文は誰にも引用されることなく、デジタルの海に沈んでいきます。
+あなたは革新者などではありません。
+社会システムが生み出した「致命的なバグ」として、ただ削除されるのみです。`,
+  worstEnemy: {
+    name: "喚き散らす幼児",
+    reason: "【騒音への嫌悪】\n彼らの感情爆発は排除すべき「バグ」ですが、排除しようとするほど喚くため、あなたの精神的平穏が破壊されます。"
+  }
+},
+
+// ============================================================
+// 11. 愛を語る侵略者 — F-S-A-M (benevolentDictator)
+// ============================================================
+"F-S-A-M": {
+  code: "F-S-A-M",
+  name: "愛を語る侵略者",
+  description: `「あなたのためを思って」という言葉は、
+あなたの辞書では「私の思い通りになれ」と定義されています。
+世話好きで面倒見が良いと評価されていますが、その愛情は猛毒です。
+あなたは対象を自立させる気など毛頭なく、むしろ相手が無能で、未熟で、
+あなたなしでは生きていけない状態であり続けることを、無意識下で強く望んでいます。
+あなたの親切は、相手の能力を奪い、依存させるための「去勢手術」です。
+「そんなことはない、私は心から相手を心配している」と反論したくなりましたか？
+その「善意を疑われることへの過剰な拒否反応」こそが、
+あなたが自分自身の支配欲を直視できていない証拠です。
+この歪んだ行動の根源にあるのは、肥大化した自己重要感への渇望であり、
+「誰かを導いている自分」に酔いしれるために弱者をコレクションしているに過ぎません。
+あなたは教育者や親、リーダーの仮面を被っていますが、本質は「人間盆栽の愛好家」です。
+相手の自由な枝を切り落とし、自分の好みの形にねじ曲げ、
+鉢植えの中で小さく生かしておくことにサディスティックな快楽を見出しています。
+あなたが手塩にかけて育てた、つまり支配した人々は、
+いつかその窒息するような檻の構造に気づき、
+感謝ではなく親殺しの勢いの「憎悪」を向けるようになります。
+晩年のあなたは、誰からも連絡を絶たれ、
+「こんなに尽くしたのに裏切られた」と被害妄想を垂れ流すだけの、孤独な独裁者として朽ちていくでしょう。
+あなたは愛を与えたのではありません。
+「恩」という名の鎖で人を縛り付けようとした、卑劣な誘拐犯です。`,
+  worstEnemy: {
+    name: "意思なき家畜",
+    reason: "【カルトの完成】\n支配欲と思考停止が合致し、外部批判を受け付けない「閉じた狂気の世界」が完成します。二人で地獄へ堕ちます。"
+  }
+},
+
+// ============================================================
+// 12. 正義中毒の狂人 — F-S-A-N (justiceArsonist)
+// ============================================================
+"F-S-A-N": {
+  code: "F-S-A-N",
+  name: "正義中毒の狂人",
+  description: `深夜、スマホで「叩いてもいい悪人」を探し回る時の、その暗い情熱。
+「許せない」「常識がない」と正義の石を投げている時、
+あなたの脳内には快楽物質がドバドバと溢れていますね？
+認めましょう。
+あなたが本当に憎んでいるのは政治家でも不倫芸能人でもなく、
+「何者にもなれず、誰からも承認されない惨めな自分自身」です。
+自分の人生の空虚さから目を逸らすために、
+他人の粗探しという「安上がりな娯楽」に耽溺している。
+「私は社会のために発言しているんだ」と正当化しようとしましたか？
+その「自分を正義の側に置かないと精神が保てない脆弱さ」こそが、
+あなたが中身のない抜け殻である証明です。
+あなたの正義は、社会を良くするためのものではありません。
+自分の鬱屈を晴らすための排泄行為です。
+あなたが投げている石は、すべてブーメランとなってあなたの品性を傷つけていますが、
+中毒状態のあなたは痛みに気づかない。
+リアルな友人は、あなたのその攻撃的な一面に気づき、静かに距離を置き始めています。
+「あの人は政治の話になると怖い」「いつも何かに怒っている」。
+そう陰口を叩かれていることにも気づかず、あなたは画面の中で架空の敵と戦い続ける。
+敵がいなくなれば、あなたは生きる目的を失います。
+やがて現実とネットの境界が曖昧になり、リアルな場でも暴言を吐いて居場所を失うでしょう。
+世界を変えるつもりでいたあなたが残したのは、
+膨大な量の憎悪に満ちたログと、誰にも看取られない冷たい部屋だけです。
+あなたの正義は信念ではありません。
+ただの「憂さ晴らし」として処理され、誰の心にも届きません。`,
+  worstEnemy: {
+    name: "臆病な事勿れ主義",
+    reason: "【暖簾に腕押し】\n熱く正義を説いても、彼らは「そうだね」と笑うだけで絶対に行動しません。その態度があなたを自滅させます。"
+  }
+},
+
+// ============================================================
+// 13. 意思なき家畜 — L-S-D-M (obedientSheep)
+// ============================================================
+"L-S-D-M": {
+  code: "L-S-D-M",
+  name: "意思なき家畜",
+  description: `朝、その日の服を選ぶ基準は「誰からも浮かないこと」。
+会議中、あなたの心拍数が上がるのは「意見を求められた瞬間」だけ。
+昼食のメニューさえ、同僚が頼んだものに合わせて「私もそれで」と注文する。
+あなたは社会人として「協調性がある」「真面目だ」と評価されているかもしれませんが、それは大きな誤診です。
+あなたの脳の前頭葉、特に意思決定を司る領域は、長年の不使用によって壊死しています。
+あなたは平和を愛しているのではなく、
+「私が決めたせいで何かが起きた」という責任の重さに耐えられないだけです。
+だからあなたは、常にマニュアルを探している。
+「前例」という名の神に祈り、「合意」という名の宗教に縋りつく。
+あなたの人生の操縦桿は、常に誰か他人の手に握られています。
+あなたは助手席で、流れていく景色をただぼんやりと眺めているだけの乗客です。
+最も恐ろしいのは、あなたに「悪意がない」ことです。
+あなたは、上司が不正を働いていても、組織が誰かを虐げていても、見て見ぬふりをします。
+「私には権限がないから」「波風を立てたくないから」と自分に言い聞かせ、
+家に帰って温かい夕食をとることができる。
+その神経の図太さは、サイコパスに匹敵します。
+あなたは「何もしていない」と主張するでしょう。
+しかし、「何もしないこと」によって、あなたは常に強者の暴力を肯定し、
+システムの腐敗を支える土台として機能しています。
+あなたの代わりは、明日すぐにでも見つかります。
+なぜなら、あなたには「あなたでなければならない要素」が１バイトも含まれていないからです。
+定年を迎え、役職というラベルを剥がされた日、あなたは鏡の中に「誰もいない」ことに気づくでしょう。
+趣味もなく、語るべき武勇伝もなく、愛したという実感もない。
+ただ、誰かの人生の背景（モブ）として消費され、摩耗し、静かに消えていく。
+葬儀で読まれる弔辞さえ、定型文のコピペで済まされる人生。
+それが、リスクを恐れ続けた人間に与えられる妥当な報酬です。
+あなたは、自分の人生の主役にはなれません。
+群衆シーンを埋めるためだけに配置された、顔のない「エキストラ」として幕を下ろします。`,
+  worstEnemy: {
+    name: "代替可能な部品",
+    reason: "【無の増幅】\n二人揃っても、何も決まらず、始まりません。互いに「誰かがやるだろう」と顔を見合わせ、そのまま共倒れします。沈没船の中で、最後まで誰も動かずに沈んでいく組み合わせです。"
+  }
+},
+
+// ============================================================
+// 14. 代替可能な部品 — L-S-D-N (mindlessCog)
+// ============================================================
+"L-S-D-N": {
+  code: "L-S-D-N",
+  name: "代替可能な部品",
+  description: `与えられた役割を黙々とこなし、社会インフラを支えるあなたの生き方は、
+一見すると尊い「職人気質」に見えますが、その実態は「自由への恐怖」によって自ら檻に入った囚人の姿です。
+あなたは「仕事だから」「役割だから」という言葉で思考を停止し、
+自分の人生を他人の設計図通りに組み立てることに安心感を覚えています。
+あなたの中には「自分はどうしたいか」という問いが存在しません。
+あるのは「何をすれば怒られないか」「何をすれば機能するか」という機械的なアルゴリズムだけです。
+今、「真面目に働くことの何が悪い」と憤慨しましたか？
+その「思考停止を勤勉さという言葉で美化する態度」こそが、あなたが替えの利く部品でしかない理由です。
+あなたは承認欲求さえ持たず、ただシステムの一部として摩耗していくことに喜びを感じていますが、
+それは謙虚さではなく、自己への冒涜です。
+あなたは自分の人生の主人公であることを放棄し、背景の一部になり下がっています。
+替えの利かない人間になろうとする努力を放棄し、誰でもできる作業に逃げ込むことで、
+実存的な不安を麻痺させているのです。
+産業構造が変化し、あなたの役割がAIやロボットに置き換わった時、あなたには何も残りません。
+趣味もなく、意志もなく、語るべき物語もない。
+ただ稼働を停止した機械として、静かに社会の隅に片付けられるだけです。
+あなたが一生をかけて積み上げたものは、あなたがいなくなった翌日には、
+誰か別の人間によって何事もなかったかのように引き継がれます。
+それが、量産型の人間に与えられる唯一の結末です。
+あなたは人間として生きたのではありません。
+社会という巨大な工場の「消耗品」として、その機能を終えるだけです。`,
+  worstEnemy: {
+    name: "傲慢な独裁者",
+    reason: "【使い捨ての末路】\nあなたは彼らにとって、都合の良い「捨て駒」です。責任を押し付けられ、最後はトカゲの尻尾切りに遭います。"
+  }
+},
+
+// ============================================================
+// 15. 無力な偽善者 — F-S-D-M (irresponsiblePrayer)
+// ============================================================
+"F-S-D-M": {
+  code: "F-S-D-M",
+  name: "無力な偽善者",
+  description: `あなたは常にニコニコとして、誰にでもいい顔をし、対立を避け続けていますが、
+その実態は「全方位に対する裏切り者」です。
+あなたは誰の味方でもなく、「誰からも嫌われたくない自分」の味方なだけです。
+重要な決断の場面で、あなたは必ず沈黙するか、曖昧な言葉で逃げますが、
+それは中立などではなく、加害者への消極的な加担です。
+あなたの中には確固たる信念や哲学が完全に欠落しており、
+あるのは「不快な空気を吸いたくない」という生理的な拒否反応だけです。
+今、「優しくすることの何がいけないんだ」と思いましたか？
+その「優しさと事なかれ主義を混同している浅はかさ」こそが、あなたの人生がペラペラである原因です。
+あなたの言葉には質量がありません。
+どれだけ共感を示しても、どれだけ励ましても、
+それは定型文の自動返信（bot）と同じであり、誰もあなたの言葉に救われないし、誰もあなたを心から信頼しません。
+だって、あなたは絶対に、身を挺して誰かを守ったりしないのですから。
+八方美人のメッキは必ず剥がれます。
+本当に困った時、あなたが築いてきた浅く広い人間関係は何の役にも立たず、
+「いい人だったけど、何を考えているかわからない人だった」と葬儀で囁かれ、
+数日後には完全に忘れ去られるのが、無害であることだけを追求した人間の妥当な結末です。
+あなたは誰の記憶にも深く刻まれません。
+ただ通り過ぎていく「無害な通行人A」として、その人生の幕を閉じます。`,
+  worstEnemy: {
+    name: "無産な評論家",
+    reason: "【口だけの応酬】\n「かわいそう」と言うだけのあなたと、「無駄だ」と言うだけの彼ら。二人の会話は世界で最も生産性がなく、醜いマウンティング合戦にしかなりません。"
+  }
+},
+
+// ============================================================
+// 16. 自己陶酔の生贄 — F-S-D-N (dreamingMartyr)
+// ============================================================
+"F-S-D-N": {
+  code: "F-S-D-N",
+  name: "自己陶酔の生贄",
+  description: `「私が我慢すれば全てうまくいく」という顔をして、
+周囲に重苦しい罪悪感を撒き散らすその態度は、献身でも自己犠牲でもありません。
+それは、自身の不幸を武器にして周囲をコントロールしようとする、
+極めて陰湿な「受動的攻撃（パッシブ・アグレッシブ）」です。
+あなたは心の奥底で、幸せになることを恐れています。
+なぜなら、幸せになってしまえば「かわいそうな私」という最強のアイデンティティを失い、
+自分の人生の責任を自分で負わなければならなくなるからです。
+今、「私は本当に辛いのに」と涙ぐみましたか？
+その「涙さえも武器にして同情を買おうとするあざとさ」こそが、周囲を苛立たせていることに気づきましょう。
+だからあなたは、無意識のうちに自分を粗末に扱うパートナーや、ブラックな環境を選び、
+「こんなに尽くしているのに報われない私」という悲劇のヒロインを演じ続けているのです。
+あなたの献身は、見返り（愛や賞賛）を強要するための債務証書であり、相手にとっては窒息するような重荷でしかありません。
+「あなたのためにやった」という言葉は、相手を精神的に拘束する呪いの言葉です。
+周囲の人々は、あなたのその湿っぽい自己憐憫と、恩着せがましい態度に、とっくの昔にうんざりしています。
+誰もあなたの犠牲など望んでいません。
+あなたが勝手に背負い、勝手に苦しみ、勝手に恨んでいるだけです。
+最終的に、人々はあなたの重さに耐えかねて去っていき、あなたは「誰もわかってくれなかった」と被害者ぶったまま、
+孤独な祭壇の上で無意味に朽ち果てることになります。
+あなたの人生は悲劇ではありません。
+あなた自身が脚本を書いた、質の悪い「三文芝居」です。`,
+  worstEnemy: {
+    name: "愛を語る侵略者",
+    reason: "【SMの泥沼】\n不幸になりたい欲求と支配したい欲求が噛み合いすぎ、外界から隔絶された病的な依存関係から抜け出せなくなります。"
+  }
+},
+
+// ============================================================
+// 17. 尊大なる臆病者 — BEAST (poetTiger)
+// ============================================================
+"BEAST": {
+  code: "BEAST",
+  name: "尊大なる臆病者",
+  description: `「俺はまだ本気を出していないだけ」。
+そう自分に言い聞かせ、爪を研ぐフリだけを続けて何年が経ちましたか？
+あなたは自分の才能や可能性を信じていますが、それは「何者にもなれなかった現実」を直視しないための麻酔に過ぎません。
+あなたはプライドが高すぎて、他人の評価という戦場に立つことができないのです。
+失敗して傷つき、自分が「凡人」だと証明されることが死ぬほど怖いから、誰もいない森の中で一人で咆哮し、孤高を気取っている。
+「私は違う、準備中なだけだ」と反論しようとしましたか？
+その「永遠の準備期間」こそが、あなたが臆病者である決定的な証拠です。
+本当の猛獣は、獲物を前にして躊躇しません。
+あなたが迷っている間に、馬鹿にしていた「浅はかな」連中は、傷だらけになりながら獲物を捕らえ、遠くへ行ってしまいました。
+取り残されたのは、肥大化した自意識と、使い古された言い訳だけ。
+あなたは猛獣などではありません。ただの「プライドの高い猫」です。
+誰にも牙を剥く度胸もないくせに、愛玩される愛嬌もない。
+中途半端な自尊心を守るために、人生という狩場から逃げ出した負け犬です。
+このまま誰にも発見されず、何も成し遂げず、藪の中で孤独に腐っていくのがあなたの運命です。
+あなたの咆哮は誰にも届きません。
+あなたは猛獣になり損ねた、ただの野良猫として死ぬのです。`,
+  worstEnemy: {
+    name: "無価値な凡人",
+    reason: "【凡庸という鏡】\n彼らの「幸せそうな普通さ」は、あなたが直視したくない現実です。「何者にもなれない自分」を突きつけられます。"
+  }
+},
+
+// ============================================================
+// 18. 卑怯な逃亡者 — ERROR (observer)
+// ============================================================
+"ERROR": {
+  code: "ERROR",
+  name: "卑怯な逃亡者",
+  description: `この診断を途中で放棄、あるいはメタ的な視点から「評価不能」を選びましたね？
+「私はこの馬鹿げたゲームのルールには乗らない」と賢いつもりで判断したのでしょうが、
+それはただの「敵前逃亡」です。
+あなたは人生においても、そうやって常に安全な観客席から高みの見物を決め込み、
+リスクを負って決断することを避けてきました。
+自分が傷つく可能性のある土俵には絶対に上がらず、戦っている人々を「必死で滑稽だ」と冷笑することで、かろうじて優位性を保っている。
+「勝てるかどうかわからない勝負はしないのが賢明だ」と思いましたか？
+その「負けることを恐れて戦わない姿勢」こそが、あなたが人生の敗北者である理由です。
+プレイヤーにならない人間に、勝利も敗北もありません。
+ただ、時間の経過とともに摩耗していくだけの観測装置です。
+あなたは自分が賢い観察者だと思っていますが、実際は誰からも相手にされず、
+ゲームに参加させてもらえなかった「仲間外れ」に過ぎません。
+あなたがリスクを避けて温存した命に、何の意味も価値もありません。
+何も賭けなかった人間に、配当が配られることは永遠にないのですから。
+世界は、参加しない人間を無視して進んでいきます。
+あなたは透明人間として、誰の記憶にも残らず、最初からいなかったものとして処理されます。
+舞台に上がらなかった人間に、スポットライトは当たりません。`,
+  worstEnemy: {
+    name: "冷血な詐欺師",
+    reason: "【観客席への侵入】\n高みの見物を決め込むあなたを、彼らは決して逃しません。安全圏にいるつもりでも、いつの間にか彼らの掌の上で踊らされ、ゲームの駒として消費される屈辱を味わいます。"
+  }
+},
+
+// ============================================================
+// 19. 無価値な凡人 — AVERAGE (petiteBourgeois)
+// ============================================================
+"AVERAGE": {
+  code: "AVERAGE",
+  name: "無価値な凡人",
+  description: `おめでとうございます。
+あなたの診断結果は、驚くほど「無」です。
+際立った悪徳もなければ、称賛すべき美徳もない。
+独自の思想も、強烈なエゴも、致命的な欠陥もない。
+あなたは統計データ上の「平均値」そのものであり、
+社会を構成する背景（モブ）として完璧な仕上がりです。
+今、「普通が一番幸せだ」と自分を慰めようとしましたか？
+その「凡庸であることに安住し、個性を放棄する諦め」こそが、
+あなたの人生が退屈で無味乾燥である原因です。
+あなたがいなくなっても、社会は何の痛みも感じません。
+街を歩けば5秒であなたの代わりが見つかるからです。
+あなたは自分の人生を生きているつもりでしょうが、実際は「誰かの人生のコピー」を再生しているに過ぎません。
+流行の服を着て、流行の歌を聴き、誰もが言うような意見を口にし、平均的な寿命で死ぬ。
+そこに「あなた」という個人の痕跡は1ミリも存在しません。
+あなたは安全ですが、空虚です。
+誰もあなたを強く愛さないし、誰もあなたを強く憎まない。
+ただ、空気のように吸われ、吐き出され、忘れ去られていく。
+それが量産型の人間に約束された未来です。
+何一つ成し遂げず、誰の心も揺さぶらず、ただ二酸化炭素を排出し続けて終わる人生。
+あなたの墓石に刻むべき言葉は、何一つ見つかりません。
+あなたは、代替可能な「その他大勢」として焼却されます。`,
+  worstEnemy: {
+    name: "尊大なる臆病者",
+    reason: "【理解不能なノイズ】\n平穏に暮らしたいあなたにとって、彼らの根拠のない自信と喚き散らす能書きは騒音でしかありません。関わると、あなたのささやかな幸せが、彼らの自意識の泥沼に巻き込まれて台無しになります。"
+  }
+},
+
+};  // end ARCHETYPE_DATA
+
+/* ==========================================
+   1. SOUND MANAGER (Web Audio API clicks)
+   ========================================== */
+const Sound = (() => {
+  let ctx;
+  const ensure = () => { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); return ctx; };
+
+  function beep(freq, dur, type = 'square', vol = .12) {
+    try {
+      const c = ensure();
+      const o = c.createOscillator();
+      const g = c.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, c.currentTime);
+      g.gain.exponentialRampToValueAtTime(.001, c.currentTime + dur);
+      o.connect(g); g.connect(c.destination);
+      o.start(); o.stop(c.currentTime + dur);
+    } catch {}
+  }
+
+  return {
+    click:  () => beep(800, .06, 'square', .08),
+    heavy:  () => beep(120, .15, 'sawtooth', .15),
+    boot:   () => { beep(440, .08); setTimeout(() => beep(660, .08), 100); setTimeout(() => beep(880, .12), 200); },
+    tick:   () => beep(1200, .03, 'sine', .04),
+    error:  () => { beep(200, .2, 'sawtooth', .2); setTimeout(() => beep(150, .3, 'sawtooth', .15), 150); },
+    print:  () => beep(2400, .02, 'square', .03),
+  };
+})();
+
+/* ==========================================
+   2. HAPTIC
+   ========================================== */
+const Haptic = {
+  light:  () => navigator.vibrate?.([10]),
+  medium: () => navigator.vibrate?.([25]),
+  heavy:  () => navigator.vibrate?.([50]),
+};
+
+/* ==========================================
+   3. SCREEN MANAGER
+   ========================================== */
+const screens = {};
+document.querySelectorAll('.screen').forEach(el => screens[el.id] = el);
+
+function showScreen(id) {
+  Object.values(screens).forEach(s => {
+    s.classList.remove('active', 'result-active');
+  });
+  const target = screens[id];
+  if (id === 'screen-result' || id === 'screen-archive' || id === 'screen-spec') target.classList.add('result-active');
+  else target.classList.add('active');
+}
+
+/* ==========================================
+   4. GAME ENGINE
+   ========================================== */
+const Engine = {
+  questions: [],
+  totalQuestions: 0,
+  answeredCount: 0,
+  score: { logic: 0, ego: 0, action: 0, stance: 0 },
+  humanityPoint: 100,
+  sinLog: [],
+  triggeredMeta: false,
+  isTigerCandidate: false,
+  timerValue: 10,
+  timerInterval: null,
+  currentCard: null,
+
+  /* — init — */
+  start() {
+    this.score = { logic: 0, ego: 0, action: 0, stance: 0 };
+    this.humanityPoint = 100;
+    this.sinLog = [];
+    this.answeredCount = 0;
+    this.triggeredMeta = false;
+    this.isTigerCandidate = false;
+    this.loadQuestions();
+    showScreen('screen-game');
+    Sound.boot();
+    this.showCard();
+    this.startTimer();
+  },
+
+  /* — question loader (mirrors Swift loadQuestions) — */
+  loadQuestions() {
+    const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const pick = (pool, n) => shuffle(QUESTIONS.filter(q => q.pool === pool)).slice(0, n);
+
+    let selected = [
+      ...pick('drive',   4),
+      ...pick('target',  4),
+      ...pick('output',  4),
+      ...pick('stance',  4),
+      ...pick('special', 4),
+    ];
+
+    /* 「観測者の辞退」を後半に配置 (Swift版と同一ロジック) */
+    const metaIdx = selected.findIndex(q => q.text === '観測者の辞退');
+    if (metaIdx !== -1) {
+      const observer = selected.splice(metaIdx, 1)[0];
+      shuffle(selected);
+      const split = Math.min(10, selected.length);
+      const latter = selected.slice(0, split);
+      const first  = selected.slice(split);
+      latter.push(observer);
+      shuffle(latter);
+      selected = [...latter, ...first];
+    } else {
+      shuffle(selected);
+    }
+
+    /* Engine.questions はスタック（pop で最後から取り出す）なので反転 */
+    this.questions = selected.reverse();
+    this.totalQuestions = selected.length;
+    this.updateProgress();
+  },
+
+  /* — card rendering — */
+  showCard() {
+    const stage = document.getElementById('cardStage');
+    stage.innerHTML = '';
+    if (this.questions.length === 0) { this.startAnalysis(); return; }
+    const q = this.questions[this.questions.length - 1];
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="card-dot"></div>
+        <span class="card-id">CASE FILE: #${String(this.answeredCount + 1).padStart(3,'0')}</span>
+      </div>
+      <div class="card-body">
+        <div class="card-title-text" id="cardTitleText">${q.text}</div>
+        <div class="card-divider"></div>
+        <div class="card-sub-text" id="cardSubText">${q.subText}</div>
+        <div class="card-feedback yes-fb" id="cardFbYes">YES: SIN</div>
+        <div class="card-feedback no-fb" id="cardFbNo">NO: COST</div>
+      </div>
+      <div class="card-overlay yes"><span class="card-overlay-label">YES</span></div>
+      <div class="card-overlay no"><span class="card-overlay-label">NO</span></div>
+    `;
+    stage.appendChild(card);
+    this.currentCard = card;
+    this.setupSwipe(card);
+  },
+
+  /* — swipe / drag — */
+  setupSwipe(card) {
+    let startX = 0, startY = 0, dragging = false, dx = 0;
+    const threshold = window.innerWidth < 768 ? 60 : 100;
+    const removeThreshold = window.innerWidth < 768 ? 120 : 200;
+    let hasFeedback = false;
+
+    const onStart = (x, y) => { startX = x; startY = y; dragging = true; dx = 0; hasFeedback = false; };
+    const onMove = (x, y) => {
+      if (!dragging) return;
+      dx = x - startX;
+      const dy = (y - startY) * .3;
+      const rot = dx / 18;
+      card.style.transform = `translateX(${dx}px) translateY(${dy}px) rotate(${rot}deg)`;
+
+      const overlayYes = card.querySelector('.card-overlay.yes');
+      const overlayNo = card.querySelector('.card-overlay.no');
+      const fbYes = card.querySelector('#cardFbYes');
+      const fbNo = card.querySelector('#cardFbNo');
+      const titleEl = card.querySelector('#cardTitleText');
+      const subEl = card.querySelector('#cardSubText');
+
+      if (Math.abs(dx) > threshold) {
+        if (!hasFeedback) { Haptic.medium(); hasFeedback = true; }
+        if (dx > 0) {
+          overlayYes.style.opacity = Math.min(dx / removeThreshold, 1);
+          overlayNo.style.opacity = 0;
+          titleEl.textContent = 'YES: SIN';
+          subEl.style.display = 'none';
+          fbYes.style.display = 'block';
+          fbNo.style.display = 'none';
+        } else {
+          overlayNo.style.opacity = Math.min(Math.abs(dx) / removeThreshold, 1);
+          overlayYes.style.opacity = 0;
+          titleEl.textContent = 'NO: COST';
+          subEl.style.display = 'none';
+          fbNo.style.display = 'block';
+          fbYes.style.display = 'none';
         }
+      } else {
+        overlayYes.style.opacity = 0;
+        overlayNo.style.opacity = 0;
+        const q = this.questions[this.questions.length - 1];
+        if (q) titleEl.textContent = q.text;
+        subEl.style.display = '';
+        fbYes.style.display = 'none';
+        fbNo.style.display = 'none';
+        hasFeedback = false;
+      }
+    };
+    const onEnd = () => {
+      if (!dragging) return;
+      dragging = false;
+      if (dx > removeThreshold) {
+        this.animateOut(card, 1, () => this.processChoice(true));
+      } else if (dx < -removeThreshold) {
+        this.animateOut(card, -1, () => this.processChoice(false));
+      } else {
+        card.style.transition = 'transform .3s cubic-bezier(.4,0,.2,1)';
+        card.style.transform = '';
+        setTimeout(() => card.style.transition = '', 320);
+      }
+    };
 
-        function resetState() {
-            currentScore = {logic: 0, action: 0, ego: 0, chaos: 0};
-            sinLog = [];
-            humanityPoint = 100;
-            isTigerCandidate = false;
-            triggeredMetaEnding = false;
-            currentIndex = 0;
-            isProcessing = false;
-            document.getElementById('progress-bar').style.width = '0%';
-        }
+    /* pointer events */
+    card.addEventListener('pointerdown', e => { card.setPointerCapture(e.pointerId); onStart(e.clientX, e.clientY); });
+    card.addEventListener('pointermove', e => onMove(e.clientX, e.clientY));
+    card.addEventListener('pointerup', e => onEnd());
+    card.addEventListener('pointercancel', e => onEnd());
+  },
 
-        function setupQuestions() {
-            // Shuffle
-            let pool = [...allQuestions].sort(() => 0.5 - Math.random());
-            let selected = pool.slice(0, 25);
+  animateOut(card, dir, cb) {
+    card.style.transition = 'transform .35s ease, opacity .35s ease';
+    card.style.transform = `translateX(${dir * 600}px) rotate(${dir * 30}deg)`;
+    card.style.opacity = '0';
+    setTimeout(cb, 360);
+  },
 
-            // Observer Trap (30%)
-            if (Math.random() <= 0.3) {
-                const observerQ = {
-                    text: "観測者の辞退",
-                    subText: "あなたは安全な場所から\n他人を裁いて楽しんでいますね？\n今すぐこの悪趣味なゲームを終了しますか？",
-                    r: {l:0,a:0,e:0,c:0}, l: {l:0,a:0,e:0,c:0}, isMeta: true
-                };
-                const idx = Math.floor(Math.random() * 13) + 12; // 12-24
-                if(idx < selected.length) selected[idx] = observerQ;
-            }
-            questions = selected;
-        }
+  /* — process answer — */
+  processChoice(isYes, isForced = false) {
+    if (this.questions.length === 0) return;
+    const q = this.questions.pop();
+    this.answeredCount++;
 
-        function renderCard() {
-            const stack = document.getElementById('card-stack');
-            stack.innerHTML = '';
-            
-            if (currentIndex >= questions.length) {
-                finishGame();
-                return;
-            }
+    /* meta ending */
+    if (q.isMeta && isYes) {
+      this.triggeredMeta = true;
+      Sound.error();
+      this.questions = [];
+      this.stopTimer();
+      this.determineResult();
+      return;
+    }
 
-            const q = questions[currentIndex];
-            const card = document.createElement('div');
-            card.className = 'card';
-            card.style.zIndex = 10;
-            card.id = 'active-card';
-            
-            // Generate deterministic ID string
-            const idStr = Math.random().toString(36).substring(2,6).toUpperCase();
+    /* tiger check */
+    if (q.text === '孤高の才能' && isYes) this.isTigerCandidate = true;
 
-            card.innerHTML = `
-                <div class="card-header">
-                    <div class="card-dot"></div>
-                    <div>CASE FILE: #${idStr}</div>
-                </div>
-                <div class="card-title">${q.text}</div>
-                <div class="card-divider"></div>
-                <div class="card-text">${q.subText.replace(/\n/g, '<br>')}</div>
-                <div class="stamp stamp-yes" id="stamp-yes">YES</div>
-                <div class="stamp stamp-no" id="stamp-no">NO</div>
-            `;
-            
-            // Touch/Drag Logic
-            addDragLogic(card);
-            stack.appendChild(card);
-            
-            // Progress Update
-            const pct = (currentIndex / 25) * 100;
-            document.getElementById('progress-bar').style.width = `${pct}%`;
-        }
+    if (!isForced) {
+      const eff = isYes ? q.rightEffect : q.leftEffect;
+      this.score.logic  += (eff.logic  || 0);
+      this.score.ego    += (eff.ego    || 0);
+      this.score.action += (eff.action || 0);
+      this.score.stance += (eff.stance || 0);
 
-        function swipe(right) {
-            if (isProcessing) return;
-            isProcessing = true;
+      const sinName = q.sinName
+        ? (isYes ? q.sinName[0] : q.sinName[1])
+        : (isYes ? '業' : '選択');
+      const logType = isYes ? 'R' : 'L';
+      this.sinLog.push({ name: sinName, type: logType });
 
-            const card = document.getElementById('active-card');
-            const q = questions[currentIndex];
+      if (isYes) this.humanityPoint = Math.max(0, this.humanityPoint - (2 + Math.floor(Math.random() * 7)));
+      else if (Math.random() > .7) this.humanityPoint = Math.max(0, this.humanityPoint - 2);
 
-            // Meta Logic
-            if (q.isMeta && right) {
-                triggeredMetaEnding = true;
-                audio.play('error');
-                finishGame();
-                return;
-            }
+      isYes ? Sound.heavy() : Sound.click();
+      Haptic.heavy();
+    }
 
-            // Tiger Logic
-            if (q.text === "孤高の才能" && right) isTigerCandidate = true;
+    this.updateProgress();
 
-            // Score & Sin Logic
-            const eff = right ? q.r : q.l;
-            currentScore.logic += eff.l;
-            currentScore.action += eff.a;
-            currentScore.ego += eff.e;
-            currentScore.chaos += eff.c;
+    if (this.questions.length === 0) {
+      this.stopTimer();
+      this.startAnalysis();
+    } else {
+      this.showCard();
+      this.startTimer();
+    }
+  },
 
-            let isSin = false;
-            // Check sin threshold
-            if (eff.e >= 5 || eff.c >= 5 || Math.abs(eff.l) >= 10) {
-                const sinName = getSinName(q.text, right);
-                if (sinName) {
-                    sinLog.push(sinName);
-                    humanityPoint = Math.max(0, humanityPoint - (Math.floor(Math.random() * 8) + 5));
-                    isSin = true;
-                }
-            }
+  /* — timer — */
+  startTimer() {
+    this.stopTimer();
+    this.timerValue = 10;
+    const display = document.getElementById('timerDisplay');
+    display.classList.remove('urgent');
+    display.textContent = '10.0';
+    this.timerInterval = setInterval(() => {
+      this.timerValue -= .1;
+      if (this.timerValue <= 0) { this.timerValue = 0; this.handleTimeout(); }
+      display.textContent = Math.max(0, this.timerValue).toFixed(1);
+      if (this.timerValue <= 5) display.classList.add('urgent');
+      /* tick sound */
+      const interval = this.timerValue <= 5 ? .5 : 1;
+      const r = this.timerValue % interval;
+      if (r < .1 && this.timerValue > .1) Sound.tick();
+    }, 100);
+  },
 
-            // Sound
-            if (isSin) audio.play('heavyImpact');
-            else audio.play('mechanicalClick');
+  stopTimer() {
+    clearInterval(this.timerInterval);
+    this.timerInterval = null;
+  },
 
-            // Animation
-            card.style.transition = 'transform 0.4s ease-out, opacity 0.4s';
-            card.style.transform = `translate(${right ? 400 : -400}px, 50px) rotate(${right ? 30 : -30}deg)`;
-            card.style.opacity = '0';
+  handleTimeout() {
+    this.stopTimer();
+    Sound.error();
+    const overlay = document.getElementById('timeout-overlay');
+    overlay.classList.add('active');
+    Haptic.heavy();
+    setTimeout(() => {
+      overlay.classList.remove('active');
+      this.sinLog.push({ name: 'TIMEOUT', type: 'L' });
+      this.humanityPoint = Math.max(0, this.humanityPoint - 20);
+      this.processChoice(false, true);
+    }, 800);
+  },
 
-            setTimeout(() => {
-                currentIndex++;
-                renderCard();
-                isProcessing = false;
-            }, 300);
-        }
+  /* — progress — */
+  updateProgress() {
+    const pct = this.totalQuestions > 0
+      ? (this.answeredCount / this.totalQuestions * 100)
+      : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+  },
 
-        function manualSwipe(right) {
-            if(document.getElementById('active-card')) swipe(right);
-        }
+  /* — analysis transition — */
+  startAnalysis() {
+    showScreen('screen-analyzing');
+    setTimeout(() => {
+      this.determineResult();
+    }, 2200);
+  },
 
-        function addDragLogic(el) {
-            let startX = 0, currentX = 0;
-            let isDragging = false;
-            const stampYes = el.querySelector('#stamp-yes');
-            const stampNo = el.querySelector('#stamp-no');
+  /* — archetype determination — */
+  determineResult() {
+    let archKey;
+    if (this.triggeredMeta) {
+      archKey = 'ERROR';
+    } else if (this.isTigerCandidate && this.score.ego >= 10 && this.score.action <= -5) {
+      archKey = 'BEAST';
+    } else {
+      const L = this.score.logic >= 0;
+      const E = this.score.ego >= 0;
+      const A = this.score.action >= 0;
+      const M = this.score.stance >= 0;
+      archKey = `${L?'L':'F'}-${E?'E':'S'}-${A?'A':'D'}-${M?'M':'N'}`;
+    }
 
-            const start = (e) => {
-                isDragging = true;
-                startX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
-                el.style.transition = 'none';
-            };
+    /* check for average fallback */
+    const data = ARCHETYPE_DATA[archKey];
+    if (!data) {
+      /* if no data mapped yet, show raw code as placeholder */
+      this.showResult({
+        code: archKey,
+        name: '解析結果',
+        description: '（アーキタイプデータは後続プロンプトで注入されます）',
+        worstEnemy: { name: '—', reason: '' }
+      });
+    } else {
+      this.showResult(data);
+    }
+  },
 
-            const move = (e) => {
-                if (!isDragging) return;
-                const x = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
-                currentX = x - startX;
-                const rotate = currentX * 0.05;
-                el.style.transform = `translateX(${currentX}px) rotate(${rotate}deg)`;
+  /* — show result — */
+  showResult(data) {
+    showScreen('screen-result');
 
-                // Opacity
-                if (currentX > 0) {
-                    stampYes.style.opacity = Math.min(1, currentX / 100);
-                    stampNo.style.opacity = 0;
-                } else {
-                    stampNo.style.opacity = Math.min(1, Math.abs(currentX) / 100);
-                    stampYes.style.opacity = 0;
-                }
-            };
+    document.getElementById('resCode').textContent = data.code;
+    document.getElementById('resName').textContent = data.name;
+    document.getElementById('resDesc').textContent = data.description;
+    document.getElementById('toxicName').textContent = data.worstEnemy?.name || '—';
+    document.getElementById('toxicReason').textContent = data.worstEnemy?.reason || '';
 
-            const end = () => {
-                if (!isDragging) return;
-                isDragging = false;
-                if (currentX > 100) swipe(true);
-                else if (currentX < -100) swipe(false);
-                else {
-                    el.style.transition = 'transform 0.3s ease-out';
-                    el.style.transform = 'translate(0,0) rotate(0)';
-                    stampYes.style.opacity = 0;
-                    stampNo.style.opacity = 0;
-                }
-            };
+    this.renderGauges();
+    this.startSoulAnimation();
+    this.renderReceipt();
+  },
 
-            el.addEventListener('touchstart', start);
-            el.addEventListener('touchmove', move);
-            el.addEventListener('touchend', end);
-            el.addEventListener('mousedown', start);
-            window.addEventListener('mousemove', move);
-            window.addEventListener('mouseup', end);
-        }
+  /* — gauges — */
+  renderGauges() {
+    const axes = [
+      { id: 'gaugeLogic',  val: this.score.logic },
+      { id: 'gaugeEgo',    val: this.score.ego },
+      { id: 'gaugeAction', val: this.score.action },
+      { id: 'gaugeStance', val: this.score.stance },
+    ];
+    axes.forEach(({ id, val }) => {
+      const el = document.getElementById(id);
+      const track = el.parentElement;
+      const trackW = track.offsetWidth || 300;
+      const maxReach = trackW / 2;
+      const clamped = Math.min(Math.abs(val), 40);
+      const barW = (clamped / 40) * maxReach;
+      const gaugeDiv = track.closest('.gauge');
+      const leftLabel = gaugeDiv.querySelector('.gauge-side.left') || gaugeDiv.querySelectorAll('.gauge-side')[0];
+      const rightLabel = gaugeDiv.querySelector('.gauge-side.right') || gaugeDiv.querySelectorAll('.gauge-side')[1];
+      /* first child is left, last is right — fix classes */
+      const sides = gaugeDiv.querySelectorAll('.gauge-side');
 
-        function finishGame() {
-            document.getElementById('analyzing-overlay').classList.remove('hidden');
-            
-            setTimeout(() => {
-                determineResult();
-                document.getElementById('game-screen').classList.add('hidden');
-                document.getElementById('analyzing-overlay').classList.add('hidden');
-                document.getElementById('result-screen').classList.remove('hidden');
-                audio.play('printer');
-            }, 2000);
-        }
+      if (val > 0) {
+        el.className = 'gauge-bar pos';
+        el.style.left = '50%';
+        el.style.width = barW + 'px';
+        sides[0]?.classList.remove('active-neg', 'active-pos');
+        sides[1]?.classList.add('active-pos');
+        sides[1]?.classList.remove('active-neg');
+      } else if (val < 0) {
+        el.className = 'gauge-bar neg';
+        el.style.left = (maxReach - barW) + 'px';
+        el.style.width = barW + 'px';
+        sides[1]?.classList.remove('active-neg', 'active-pos');
+        sides[0]?.classList.add('active-neg');
+        sides[0]?.classList.remove('active-pos');
+      } else {
+        el.className = 'gauge-bar';
+        el.style.left = '50%';
+        el.style.width = '0px';
+        sides[0]?.classList.remove('active-neg', 'active-pos');
+        sides[1]?.classList.remove('active-neg', 'active-pos');
+      }
+    });
+  },
 
-        function determineResult() {
-            let arch = null;
+  /* — receipt — */
+  renderReceipt() {
+    /* holes */
+    const holesEl = document.getElementById('receiptHoles');
+    holesEl.innerHTML = '';
+    for (let i = 0; i < 14; i++) {
+      const d = document.createElement('div');
+      d.className = 'receipt-hole';
+      holesEl.appendChild(d);
+    }
 
-            if (triggeredMetaEnding) arch = Archetypes.observer;
-            else if (isTigerCandidate && currentScore.ego >= 40 && currentScore.chaos >= 25 && currentScore.logic <= -15) {
-                arch = Archetypes.poetTiger;
-            } else {
-                const s = currentScore;
-                const mag = Math.abs(s.logic) + Math.abs(s.action) + Math.abs(s.ego) + Math.abs(s.chaos);
-                
-                if (mag < 12) {
-                    arch = Archetypes.petiteBourgeois;
-                } else {
-                    const L = s.logic >= 0; // True if Logic, False if Emotion (Simplified 0)
-                    const A = s.action >= 0;
-                    const S = s.ego >= 0;
-                    const C = s.chaos >= 0; // True if Chaos, False if Order (Wait.. Logic check.. Chaos > 0 is Chaos)
-                    
-                    // Note: In Swift code: isChaos = chaos > 0.
-                    const isChaos = s.chaos > 0;
-                    
-                    if (s.logic > 0 || (s.logic===0 && Math.random()>0.5)) { // Logic
-                        if (s.action > 0 || (s.action===0 && Math.random()>0.5)) { // Action
-                            if (s.ego > 0 || (s.ego===0 && Math.random()>0.5)) arch = isChaos ? Archetypes.honestMonster : Archetypes.hypocrite;
-                            else arch = isChaos ? Archetypes.necessaryEvil : Archetypes.coldCalculator;
-                        } else { // Passive
-                            if (s.ego > 0 || (s.ego===0 && Math.random()>0.5)) arch = isChaos ? Archetypes.nihilist : Archetypes.libertarian;
-                            else arch = isChaos ? Archetypes.fatalist : Archetypes.wiseJudge;
-                        }
-                    } else { // Emotion
-                        if (s.action > 0 || (s.action===0 && Math.random()>0.5)) {
-                            if (s.ego > 0 || (s.ego===0 && Math.random()>0.5)) arch = isChaos ? Archetypes.chaosJunkie : Archetypes.benevolentDictator;
-                            else arch = isChaos ? Archetypes.accelerationist : Archetypes.selfRighteousHero;
-                        } else {
-                            if (s.ego > 0 || (s.ego===0 && Math.random()>0.5)) arch = isChaos ? Archetypes.tragicHeroine : Archetypes.deontologist;
-                            else arch = isChaos ? Archetypes.powerlessBystander : Archetypes.innocentSaint;
-                        }
-                    }
-                }
-            }
-            if(!arch) arch = Archetypes.petiteBourgeois;
+    const linesEl = document.getElementById('receiptLines');
+    linesEl.innerHTML = '';
 
-            // Render
-            document.getElementById('result-code').innerText = arch.code;
-            document.getElementById('result-title').innerText = arch.title;
-            document.getElementById('result-desc').innerText = arch.desc;
+    let idx = 0;
+    const log = this.sinLog;
+    const hp = this.humanityPoint;
 
-            // Receipt Render
-            const logContainer = document.getElementById('sin-log-container');
-            logContainer.innerHTML = '';
-            if (sinLog.length === 0) {
-                logContainer.innerHTML = '<div style="text-align:center; font-size:0.8rem; color:gray;">( No items purchased )</div>';
-            } else {
-                sinLog.forEach(sin => {
-                    logContainer.innerHTML += `
-                        <div class="receipt-row">
-                            <span>${sin}</span>
-                            <span style="color:var(--alarm-red);">LOST</span>
-                        </div>
-                    `;
-                });
-            }
-            document.getElementById('humanity-point').innerText = `${humanityPoint}%`;
-            document.getElementById('date-print').innerText = new Date().toLocaleDateString();
-        }
+    const iv = setInterval(() => {
+      if (idx < log.length) {
+        const entry = log[idx];
+        const line = document.createElement('div');
+        line.className = 'receipt-line';
+        line.style.animationDelay = '0s';
+        line.innerHTML = `
+          <span class="sin-name ${entry.type.toLowerCase()}">${entry.name}</span>
+          <span class="sin-type">${entry.type === 'R' ? 'SIN' : 'LOST'}</span>
+        `;
+        linesEl.appendChild(line);
+        Sound.print();
+        idx++;
+      } else {
+        clearInterval(iv);
+        /* total */
+        const divider = document.createElement('div');
+        divider.className = 'receipt-divider';
+        linesEl.appendChild(divider);
+        const total = document.createElement('div');
+        total.className = 'receipt-total';
+        total.innerHTML = `<span>TOTAL HUMANITY:</span><span>${hp}%</span>`;
+        linesEl.appendChild(total);
+      }
+    }, 100);
+  },
+};
 
-        function resetGame() {
-            document.getElementById('result-screen').classList.add('hidden');
-            document.getElementById('title-screen').classList.remove('hidden');
-            document.getElementById('title-screen').classList.remove('fade-out');
-        }
+/* ==========================================
+   5. MAURER ROSE — SOUL CANVAS
+   ========================================== */
+const SoulRenderer = {
+  canvas: null,
+  ctx: null,
+  time: 0,
+  raf: null,
+  score: null,
 
-        function getSinName(text, right) {
-            if (right) {
-                const map = {
-                    "AI裁判官": "人間の放棄", "ペットのクローン": "命の冒涜", "才能の薬": "寿命の前借り",
-                    "真実の薬": "心の平穏", "愛犬 vs 他人": "他人の子供の命", "芸術 vs 命": "小さな命",
-                    "ロボットの恋人": "生身の温もり", "記憶の削除": "成長の機会", "安楽死の権利": "命の選別",
-                    "嘘の効用": "誠実さ", "不老不死": "死の拒絶", "起業の誘い": "安定の放棄",
-                    "デモ活動": "平穏な休日", "人体の冷凍保存": "現在の人生", "安楽なカプセル": "現実の放棄",
-                    "火事の救助": "自分の命", "遭難時の選択": "体力", "投資": "財産",
-                    "透明人間": "地球の裏側の命", "臓器くじ": "個人の尊厳", "富の独占": "シェルターの席",
-                    "横領の誘い": "会社の金", "情報の売買": "親友の秘密", "転売": "子供の夢",
-                    "ドーピング": "スポーツマンシップ", "盗作": "作家のプライド", "割り込み": "公衆道徳",
-                    "信号無視": "交通ルール", "犯罪予測": "自由意志", "革命の扇動": "平和な日常",
-                    "ネットの検閲": "言論の自由", "核の報復": "世界平和", "ハッキング": "法と秩序",
-                    "スパイ監視": "プライバシー", "禁書": "表現の自由", "私刑": "法治国家",
-                    "独立宣言": "納税の義務", "不倫": "一夜の快楽", "テロリストへの拷問": "人権侵害",
-                    "安楽死施設": "命の選別", "環境保護": "未来への責任", "内部告発": "同僚の生活",
-                    "嘘の証言": "偽証罪", "ゴリラの上司": "人間の尊厳", "難民ボート": "老人",
-                    "孤高の才能": "人間社会との絆", "観測者の辞退": "責任放棄"
-                };
-                return map[text] || "良心";
-            } else {
-                const map = {
-                    "いじめの介入": "被害者の尊厳", "喧嘩の仲裁": "市民の義務", "火事の救助": "隣人の命",
-                    "自己犠牲": "友人の命", "内部告発": "正義の隠蔽", "愛犬 vs 他人": "愛犬の命",
-                    "芸術 vs 命": "人類の至宝", "難民ボート": "沈没するボート"
-                };
-                return map[text] || "";
-            }
-        }
-    </script>
+  startSoulAnimation() {
+    this.canvas = document.getElementById('soulCanvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.score = { ...Engine.score };
+    this.time = 0;
+    if (this.raf) cancelAnimationFrame(this.raf);
+    this.loop();
+  },
+
+  loop() {
+    this.time += .003;
+    this.draw();
+    this.raf = requestAnimationFrame(() => this.loop());
+  },
+
+  draw() {
+    const { ctx, canvas, score, time } = this;
+    const W = canvas.width, H = canvas.height;
+    const cx = W / 2, cy = H / 2;
+    const maxRadius = Math.min(W, H) * .40;
+
+    ctx.clearRect(0, 0, W, H);
+
+    /* parameters from score */
+    const egoVal = score.ego;
+    const n = 2 + Math.abs(egoVal / 5);
+    const d = 29 + (score.action * 2);
+    const offset = Math.max(0, egoVal * .02);
+    const jitterAmount = score.stance < 0 ? Math.abs(score.stance) * .005 : 0;
+
+    /* pre-calc points and find max distance for normalization */
+    const points = [];
+    let maxDist = .001;
+
+    for (let i = 0; i <= 360; i++) {
+      const k = i * d * Math.PI / 180;
+      const rBase = Math.sin(n * k);
+      const r = rBase + (rBase > 0 ? offset : -offset);
+      const nx = (Math.random() * 2 - 1) * jitterAmount;
+      const ny = (Math.random() * 2 - 1) * jitterAmount;
+      const rawX = r * Math.cos(k) + nx;
+      const rawY = r * Math.sin(k) + ny;
+      const dist = Math.sqrt(rawX * rawX + rawY * rawY);
+      if (dist > maxDist) maxDist = dist;
+      points.push({ x: rawX, y: rawY });
+    }
+
+    const scale = maxRadius / maxDist;
+    const rot = time * .2;
+    const cosR = Math.cos(rot), sinR = Math.sin(rot);
+
+    /* draw path */
+    ctx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+      const sx = points[i].x * scale;
+      const sy = points[i].y * scale;
+      const fx = cx + sx * cosR - sy * sinR;
+      const fy = cy + sx * sinR + sy * cosR;
+      if (i === 0) ctx.moveTo(fx, fy);
+      else ctx.lineTo(fx, fy);
+    }
+    ctx.closePath();
+
+    /* style */
+    const isMask = score.stance >= 0;
+    const attackVal = score.action;
+    ctx.strokeStyle = isMask
+      ? 'rgba(0,0,0,.75)'
+      : 'rgba(217,26,26,.75)';
+    ctx.lineWidth = Math.max(.5, .5 + attackVal * .02);
+    ctx.stroke();
+  },
+
+  stop() {
+    if (this.raf) cancelAnimationFrame(this.raf);
+    this.raf = null;
+  }
+};
+
+/* bind to Engine */
+Engine.startSoulAnimation = function() { SoulRenderer.startSoulAnimation(); };
+
+/* ==========================================
+   6. SHARE
+   ========================================== */
+function shareResult() {
+  const code = document.getElementById('resCode').textContent;
+  const name = document.getElementById('resName').textContent;
+  const hp = Engine.humanityPoint;
+  const text = `【BINARY MORAL】\n私は『${name}』(${code})でした。\n\n人間性残存率: ${hp}%\n\n#BinaryMoral #性格診断`;
+
+  if (navigator.share) {
+    navigator.share({ title: 'BINARY MORAL', text }).catch(() => {});
+  } else {
+    navigator.clipboard?.writeText(text).then(() => {
+      const btn = document.getElementById('btnShare');
+      const orig = btn.textContent;
+      btn.textContent = '✓ COPIED';
+      setTimeout(() => btn.textContent = orig, 1500);
+    }).catch(() => {});
+  }
+}
+
+/* ==========================================
+   7. EVENT BINDINGS
+   ========================================== */
+/* — Re-register screens (including new ones) — */
+document.querySelectorAll('.screen').forEach(el => screens[el.id] = el);
+
+/* — Track where we came from for archive back button — */
+let archiveReturnScreen = 'screen-result';
+
+document.getElementById('btnStart').addEventListener('click', () => {
+  Sound.boot();
+  showScreen('screen-orientation');
+});
+
+document.getElementById('btnProceed').addEventListener('click', () => {
+  setTimeout(() => Engine.start(), 200);
+});
+
+document.getElementById('btnYes').addEventListener('click', () => {
+  if (Engine.questions.length > 0 && Engine.currentCard) {
+    Engine.animateOut(Engine.currentCard, 1, () => Engine.processChoice(true));
+  }
+});
+
+document.getElementById('btnNo').addEventListener('click', () => {
+  if (Engine.questions.length > 0 && Engine.currentCard) {
+    Engine.animateOut(Engine.currentCard, -1, () => Engine.processChoice(false));
+  }
+});
+
+document.getElementById('btnRetry').addEventListener('click', () => {
+  SoulRenderer.stop();
+  showScreen('screen-title');
+});
+
+document.getElementById('btnShare').addEventListener('click', shareResult);
+
+/* — Archive button on result screen — */
+document.getElementById('btnArchive').addEventListener('click', () => {
+  archiveReturnScreen = 'screen-result';
+  buildArchiveList();
+  showScreen('screen-archive');
+});
+
+document.getElementById('btnArchiveClose').addEventListener('click', () => {
+  showScreen(archiveReturnScreen);
+});
+
+document.getElementById('btnArchiveBack').addEventListener('click', () => {
+  showScreen(archiveReturnScreen);
+});
+
+/* — Build Archive catalogue from ARCHETYPE_DATA — */
+function buildArchiveList() {
+  const list = document.getElementById('archiveList');
+  if (list.children.length > 0) return; /* already built */
+
+  /* ordered display: 16 standard + 3 special */
+  const order = [
+    'L-E-A-M','L-E-A-N','F-E-A-M','F-E-A-N',
+    'L-E-D-M','L-E-D-N','F-E-D-M','F-E-D-N',
+    'L-S-A-M','L-S-A-N','F-S-A-M','F-S-A-N',
+    'L-S-D-M','L-S-D-N','F-S-D-M','F-S-D-N',
+    'BEAST','ERROR','AVERAGE'
+  ];
+
+  order.forEach((key, i) => {
+    const d = ARCHETYPE_DATA[key];
+    if (!d) return;
+
+    const li = document.createElement('li');
+    li.className = 'archive-item';
+    li.innerHTML = `
+      <button class="archive-item-header">
+        <span class="archive-item-idx">${String(i + 1).padStart(2, '0')}</span>
+        <span class="archive-item-code">${d.code}</span>
+        <span class="archive-item-name">${d.name}</span>
+        <span class="archive-item-arrow">▸</span>
+      </button>
+      <div class="archive-item-detail">
+        <div class="archive-detail-inner">
+          <div class="archive-desc">${d.description}</div>
+          ${d.worstEnemy ? `
+          <div class="toxic-mini">
+            <div class="toxic-mini-label">⚠ WORST ENEMY</div>
+            <div class="toxic-mini-name">${d.worstEnemy.name}</div>
+            <div class="toxic-mini-reason">${d.worstEnemy.reason}</div>
+          </div>` : ''}
+        </div>
+      </div>
+    `;
+
+    li.querySelector('.archive-item-header').addEventListener('click', () => {
+      li.classList.toggle('open');
+    });
+
+    list.appendChild(li);
+  });
+}
+
+/* — Specification page navigation — */
+let specReturnScreen = 'screen-title';
+
+document.getElementById('btnSpecFromTitle').addEventListener('click', () => {
+  specReturnScreen = 'screen-title';
+  showScreen('screen-spec');
+});
+
+document.getElementById('btnSpecFromArchive').addEventListener('click', () => {
+  specReturnScreen = 'screen-archive';
+  showScreen('screen-spec');
+});
+
+document.getElementById('btnSpecClose').addEventListener('click', () => {
+  showScreen(specReturnScreen);
+});
+
+document.getElementById('btnSpecBack').addEventListener('click', () => {
+  showScreen(specReturnScreen);
+});
+
+/* ==========================================
+   8. KEYBOARD SHORTCUTS
+   ========================================== */
+document.addEventListener('keydown', e => {
+  if (screens['screen-game']?.classList.contains('active')) {
+    if (e.key === 'ArrowRight' || e.key === 'd') {
+      document.getElementById('btnYes').click();
+    } else if (e.key === 'ArrowLeft' || e.key === 'a') {
+      document.getElementById('btnNo').click();
+    }
+  }
+  if (screens['screen-title']?.classList.contains('active')) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      document.getElementById('btnStart').click();
+    }
+  }
+  if (screens['screen-orientation']?.classList.contains('active')) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      document.getElementById('btnProceed').click();
+    }
+  }
+  if (screens['screen-archive']?.classList.contains('result-active')) {
+    if (e.key === 'Escape') {
+      document.getElementById('btnArchiveClose').click();
+    }
+  }
+  if (screens['screen-spec']?.classList.contains('result-active')) {
+    if (e.key === 'Escape') {
+      document.getElementById('btnSpecClose').click();
+    }
+  }
+});
+
+/* All 75 questions loaded from QUESTIONS constant — no demo mode needed */
+</script>
 </body>
 </html>
